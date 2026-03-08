@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DashGen — Live Reports</title>
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700;900&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root {
+  --bg: #060610;
+  --panel: #0a0a18;
+  --card: #0e0e20;
+  --card2: #12122a;
+  --border: #1c1c38;
+  --border2: #252545;
+  --accent: #6366f1;
+  --accent2: #818cf8;
+  --glow: rgba(99,102,241,.2);
+  --green: #10b981;
+  --green2: #34d399;
+  --red: #ef4444;
+  --red2: #f87171;
+  --amber: #f59e0b;
+  --amber2: #fbbf24;
+  --cyan: #06b6d4;
+  --purple: #a855f7;
+  --text: #e2e2f5;
+  --muted: #6b6b99;
+  --dim: #3a3a5c;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Heebo', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* animated grid bg */
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background-image:
+    linear-gradient(rgba(99,102,241,.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(99,102,241,.04) 1px, transparent 1px);
+  background-size: 48px 48px;
+  pointer-events: none; z-index: 0;
+}
+
+/* glow orb */
+body::after {
+  content: '';
+  position: fixed;
+  top: -200px; right: -200px;
+  width: 600px; height: 600px;
+  background: radial-gradient(circle, rgba(99,102,241,.08) 0%, transparent 70%);
+  pointer-events: none; z-index: 0;
+}
+
+/* ─── TOPBAR ─── */
+.topbar {
+  position: relative; z-index: 10;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 28px;
+  height: 56px;
+  background: rgba(10,10,24,.9);
+  border-bottom: 1px solid var(--border2);
+  backdrop-filter: blur(12px);
+}
+.topbar::after {
+  content: '';
+  position: absolute; bottom: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--accent), var(--cyan), transparent);
+}
+.logo { display: flex; align-items: center; gap: 10px; }
+.logo-mark {
+  width: 30px; height: 30px; border-radius: 8px;
+  background: linear-gradient(135deg, var(--accent), var(--purple));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 15px; flex-shrink: 0;
+  box-shadow: 0 0 16px var(--glow);
+}
+.logo-text { font-size: 17px; font-weight: 900; color: #fff; letter-spacing: -.03em; }
+.logo-text span { color: var(--accent2); }
+.logo-sub { font-size: 10px; color: var(--muted); font-family: 'JetBrains Mono', monospace; }
+
+.topbar-right { display: flex; align-items: center; gap: 10px; }
+.live-badge {
+  display: flex; align-items: center; gap: 5px;
+  padding: 4px 10px; border-radius: 99px;
+  background: rgba(16,185,129,.08);
+  border: 1px solid rgba(16,185,129,.25);
+  font-size: 10px; font-weight: 700; color: var(--green2);
+  font-family: 'JetBrains Mono', monospace; letter-spacing: .08em;
+}
+.live-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--green2);
+  box-shadow: 0 0 6px var(--green2);
+  animation: blink 2s ease-in-out infinite;
+}
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+/* ─── LAYOUT ─── */
+.layout {
+  position: relative; z-index: 1;
+  display: grid;
+  grid-template-columns: 290px 1fr;
+  min-height: calc(100vh - 56px);
+}
+@media(max-width:720px){ .layout { grid-template-columns: 1fr; } }
+
+/* ─── SIDEBAR ─── */
+.sidebar {
+  background: var(--panel);
+  border-left: 1px solid var(--border2);
+  padding: 22px 16px;
+  display: flex; flex-direction: column; gap: 22px;
+  overflow-y: auto;
+  max-height: calc(100vh - 56px);
+}
+
+.sec-label {
+  font-size: 9px; font-weight: 700; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--muted);
+  margin-bottom: 9px;
+}
+
+/* ─── DROPZONE ─── */
+.drop {
+  border: 2px dashed var(--border2);
+  border-radius: 12px; padding: 22px 14px;
+  text-align: center; cursor: pointer;
+  position: relative; transition: .2s;
+  background: var(--card);
+}
+.drop:hover,.drop.over {
+  border-color: var(--accent);
+  background: rgba(99,102,241,.05);
+  box-shadow: 0 0 20px var(--glow);
+}
+.drop input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.drop-icon { font-size: 26px; margin-bottom: 7px; }
+.drop-t { font-size: 13px; font-weight: 700; color: #fff; margin-bottom: 3px; }
+.drop-s { font-size: 11px; color: var(--muted); }
+
+.finfo { background: var(--card); border: 1px solid var(--border2); border-radius: 8px; padding: 10px 12px; display: none; }
+.finfo.show { display: block; }
+.finfo-name { font-size: 12px; font-weight: 700; color: #fff; word-break: break-all; margin-bottom: 2px; }
+.finfo-meta { font-size: 10px; color: var(--muted); font-family: 'JetBrains Mono', monospace; }
+
+/* ─── SHEET TABS ─── */
+.stabs { display: flex; flex-wrap: wrap; gap: 5px; }
+.stab {
+  padding: 4px 10px; border-radius: 5px;
+  border: 1px solid var(--border2); background: var(--card);
+  color: var(--muted); font-size: 11px; cursor: pointer;
+  font-family: 'Heebo', sans-serif; transition: .15s;
+}
+.stab:hover { border-color: var(--accent); color: var(--text); }
+.stab.on { border-color: var(--accent); background: rgba(99,102,241,.12); color: var(--accent2); font-weight: 700; }
+
+/* ─── FIELDS ─── */
+.field { display: flex; flex-direction: column; gap: 5px; }
+.field label { font-size: 11px; color: var(--muted); }
+.field input, .field select, .field textarea {
+  width: 100%; background: var(--card); border: 1px solid var(--border2);
+  color: var(--text); border-radius: 8px;
+  font-family: 'Heebo', sans-serif; font-size: 13px;
+  padding: 8px 11px; outline: none; transition: .15s;
+}
+.field input:focus,.field select:focus,.field textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--glow); }
+.field textarea { min-height: 56px; resize: vertical; }
+
+/* view type grid */
+.view-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.view-opt {
+  padding: 8px 6px; border-radius: 8px;
+  border: 1px solid var(--border2); background: var(--card);
+  color: var(--muted); font-size: 11px; cursor: pointer;
+  font-family: 'Heebo', sans-serif; transition: .15s;
+  text-align: center; line-height: 1.4;
+}
+.view-opt:hover { border-color: var(--accent); color: var(--text); }
+.view-opt.on { border-color: var(--accent); background: rgba(99,102,241,.12); color: var(--accent2); font-weight: 700; }
+.view-opt .vo-icon { font-size: 16px; display: block; margin-bottom: 3px; }
+
+/* ─── GEN BUTTON ─── */
+.genbtn {
+  width: 100%; padding: 13px; border-radius: 10px; border: none;
+  background: linear-gradient(135deg, var(--accent), var(--purple));
+  color: #fff; font-size: 14px; font-weight: 700;
+  cursor: pointer; font-family: 'Heebo', sans-serif;
+  transition: .2s; position: relative; overflow: hidden;
+  box-shadow: 0 4px 20px var(--glow);
+}
+.genbtn::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: linear-gradient(135deg, transparent, rgba(255,255,255,.1), transparent);
+  transform: translateX(-100%); transition: transform .5s;
+}
+.genbtn:hover:not(:disabled)::before { transform: translateX(100%); }
+.genbtn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 8px 28px var(--glow); }
+.genbtn:disabled { background: var(--card2); color: var(--muted); cursor: not-allowed; box-shadow: none; transform: none; }
+.spin { display: none; width: 15px; height: 15px; border: 2px solid rgba(255,255,255,.25); border-top-color: #fff; border-radius: 50%; animation: spin .7s linear infinite; margin: 0 auto; }
+.genbtn.loading .btxt { display: none; }
+.genbtn.loading .spin { display: block; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* progress */
+.prog { display: none; margin-top: 8px; }
+.prog.on { display: block; }
+.pbar { height: 2px; background: var(--border2); border-radius: 2px; overflow: hidden; margin-bottom: 5px; }
+.pfill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--purple), var(--cyan)); background-size: 200% 100%; animation: shimmer 1.5s linear infinite; transition: width .4s ease; width: 0; }
+@keyframes shimmer { 0%{background-position:100% 0} 100%{background-position:-100% 0} }
+.pmsg { font-size: 10px; color: var(--muted); font-family: 'JetBrains Mono', monospace; }
+
+/* ─── MAIN ─── */
+.main { padding: 24px; overflow-y: auto; }
+
+.empty {
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; min-height: 58vh;
+  text-align: center; gap: 12px;
+}
+.empty-icon { font-size: 48px; opacity: .25; }
+.empty-t { font-size: 21px; font-weight: 700; color: var(--muted); }
+.empty-s { font-size: 13px; color: var(--dim); max-width: 300px; line-height: 1.6; }
+
+/* error */
+.errbox { background: rgba(239,68,68,.07); border: 1px solid rgba(239,68,68,.25); border-radius: 10px; padding: 14px 16px; margin-bottom: 16px; display: none; }
+.errbox.on { display: block; }
+.err-t { font-size: 13px; font-weight: 700; color: var(--red2); margin-bottom: 4px; }
+.err-d { font-size: 12px; color: var(--red2); font-family: 'JetBrains Mono', monospace; line-height: 1.6; word-break: break-all; }
+.err-h { font-size: 11px; color: var(--muted); margin-top: 7px; padding-top: 7px; border-top: 1px solid rgba(239,68,68,.15); line-height: 1.5; }
+
+/* result */
+.rhdr { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; }
+.rtitle { font-size: 17px; font-weight: 900; color: #fff; display: flex; align-items: center; gap: 8px; }
+.rtitle-badge { font-size: 10px; padding: 3px 9px; border-radius: 99px; background: rgba(16,185,129,.1); border: 1px solid rgba(16,185,129,.25); color: var(--green2); font-family: 'JetBrains Mono', monospace; font-weight: 700; letter-spacing: .07em; }
+.rbtns { display: flex; gap: 7px; flex-wrap: wrap; }
+.btn { padding: 8px 15px; border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer; font-family: 'Heebo', sans-serif; transition: .15s; text-decoration: none; display: inline-flex; align-items: center; gap: 5px; border: none; }
+.btn-green { background: var(--green); color: #000; }
+.btn-green:hover { background: var(--green2); }
+.btn-ghost { background: transparent; border: 1px solid var(--border2); color: var(--muted); }
+.btn-ghost:hover { border-color: var(--accent2); color: var(--accent2); }
+.btn-accent { background: transparent; border: 1px solid rgba(99,102,241,.4); color: var(--accent2); }
+.btn-accent:hover { background: rgba(99,102,241,.08); }
+
+/* preview */
+.pwrap { background: var(--card); border: 1px solid var(--border2); border-radius: 14px; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,.4); }
+.pbar2 { padding: 10px 14px; background: var(--panel); border-bottom: 1px solid var(--border2); display: flex; align-items: center; gap: 7px; }
+.pdot { width: 9px; height: 9px; border-radius: 50%; }
+.plbl { font-size: 11px; color: var(--muted); font-family: 'JetBrains Mono', monospace; margin-right: 8px; }
+.pframe { width: 100%; height: 70vh; border: none; background: var(--bg); }
+
+/* history */
+.hist { margin-top: 24px; padding-top: 18px; border-top: 1px solid var(--border); display: none; }
+.hist.on { display: block; }
+.hlbl { font-size: 9px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
+.hlist { display: flex; flex-direction: column; gap: 6px; }
+.hitem { background: var(--card); border: 1px solid var(--border2); border-radius: 8px; padding: 10px 12px; display: flex; align-items: center; justify-content: space-between; gap: 10px; cursor: pointer; transition: .15s; }
+.hitem:hover { border-color: var(--accent); box-shadow: 0 0 12px var(--glow); }
+.hn { font-size: 12px; font-weight: 700; color: #fff; }
+.hm { font-size: 10px; color: var(--muted); font-family: 'JetBrains Mono', monospace; margin-top: 1px; }
+.hdl { font-size: 11px; padding: 4px 9px; border-radius: 5px; border: 1px solid var(--border2); background: transparent; color: var(--muted); cursor: pointer; font-family: 'Heebo', sans-serif; transition: .15s; flex-shrink: 0; }
+.hdl:hover { border-color: var(--green); color: var(--green); }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">
+    <div class="logo-mark">📊</div>
+    <div>
+      <div class="logo-text">Dash<span>Gen</span></div>
+      <div class="logo-sub">AI-POWERED LIVE REPORTS</div>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <div class="live-badge"><div class="live-dot"></div>LIVE</div>
+  </div>
+</div>
+
+<div class="layout">
+<aside class="sidebar">
+
+  <div>
+    <div class="sec-label">1. העלאת קובץ</div>
+    <div class="drop" id="drop">
+      <input type="file" id="fin" accept=".xlsx,.xls,.csv">
+      <div class="drop-icon">📁</div>
+      <div class="drop-t">גרור קובץ Excel</div>
+      <div class="drop-s">.xlsx  .xls  .csv</div>
+    </div>
+    <div class="finfo" id="finfo">
+      <div class="finfo-name" id="fname"></div>
+      <div class="finfo-meta" id="fmeta"></div>
+    </div>
+  </div>
+
+  <div id="ssec" style="display:none">
+    <div class="sec-label">2. בחירת גיליון</div>
+    <div class="stabs" id="stabs"></div>
+  </div>
+
+  <div id="csec" style="display:none">
+    <div class="sec-label">3. פרטי הדוח</div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div class="field">
+        <label>שם לקוח / קמפיין</label>
+        <input type="text" id="cname" placeholder="לדוגמה: ENAV, חברת ABC...">
+      </div>
+      <div class="field">
+        <label>תקופת הדוח</label>
+        <input type="text" id="period" placeholder="לדוגמה: פברואר 2026, Q1...">
+      </div>
+      <div class="field">
+        <label>תחום / ענף</label>
+        <input type="text" id="industry" placeholder="לדוגמה: נדל&quot;ן, אי-קומרס...">
+      </div>
+    </div>
+  </div>
+
+  <div id="vsec" style="display:none">
+    <div class="sec-label">4. סוג תצוגה</div>
+    <div class="view-grid" id="viewGrid">
+      <div class="view-opt on" data-val="live_kpi" onclick="selectView(this)">
+        <span class="vo-icon">⚡</span>Live KPI
+      </div>
+      <div class="view-opt" data-val="trend_analysis" onclick="selectView(this)">
+        <span class="vo-icon">📈</span>ניתוח מגמות
+      </div>
+      <div class="view-opt" data-val="comparison" onclick="selectView(this)">
+        <span class="vo-icon">⚖️</span>השוואת תקופות
+      </div>
+      <div class="view-opt" data-val="funnel" onclick="selectView(this)">
+        <span class="vo-icon">🔽</span>משפך המרות
+      </div>
+      <div class="view-opt" data-val="insights_report" onclick="selectView(this)">
+        <span class="vo-icon">🧠</span>דוח תובנות
+      </div>
+      <div class="view-opt" data-val="executive" onclick="selectView(this)">
+        <span class="vo-icon">👔</span>Executive
+      </div>
+    </div>
+  </div>
+
+  <div id="xsec" style="display:none">
+    <div class="sec-label">5. הקשר נוסף (אופציונלי)</div>
+    <div class="field">
+      <textarea id="ctx" placeholder="יעדים, נקודות דגש, מה חשוב להציג..."></textarea>
+    </div>
+  </div>
+
+  <div id="gsec" style="display:none">
+    <button class="genbtn" id="gbtn" onclick="generate()">
+      <span class="btxt">✨ צור דוח Live</span>
+      <div class="spin"></div>
+    </button>
+    <div class="prog" id="prog">
+      <div class="pbar"><div class="pfill" id="pfill"></div></div>
+      <div class="pmsg" id="pmsg"></div>
+    </div>
+  </div>
+
+</aside>
+
+<main class="main">
+  <div class="empty" id="empty">
+    <div class="empty-icon">📊</div>
+    <div class="empty-t">מוכן ליצור דוח Live</div>
+    <div class="empty-s">העלה קובץ Excel, בחר סוג תצוגה ולחץ "צור דוח Live"</div>
+  </div>
+
+  <div class="errbox" id="errbox">
+    <div class="err-t" id="errt"></div>
+    <div class="err-d" id="errd"></div>
+    <div class="err-h" id="errh"></div>
+  </div>
+
+  <div id="res" style="display:none">
+    <div class="rhdr">
+      <div class="rtitle">
+        <span id="rtitle">דוח מוכן</span>
+        <span class="rtitle-badge">LIVE</span>
+      </div>
+      <div class="rbtns">
+        <button class="btn btn-ghost" onclick="dl()">⬇ הורד HTML</button>
+        <a class="btn btn-accent" id="openBtn" target="_blank">↗ פתח בטאב</a>
+        <button class="btn btn-green" onclick="copyShareLink()">🔗 העתק קישור</button>
+      </div>
+    </div>
+    <div class="pwrap">
+      <div class="pbar2">
+        <div class="pdot" style="background:#ef4444"></div>
+        <div class="pdot" style="background:#f59e0b"></div>
+        <div class="pdot" style="background:#22c55e"></div>
+        <span class="plbl" id="plbl">תצוגה מקדימה</span>
+        <div class="live-badge" style="margin-right:auto"><div class="live-dot"></div>LIVE PREVIEW</div>
+      </div>
+      <iframe class="pframe" id="pframe"></iframe>
+    </div>
+  </div>
+
+  <div class="hist" id="hist">
+    <div class="hlbl">דוחות שנוצרו בסשן זה</div>
+    <div class="hlist" id="hlist"></div>
+  </div>
+</main>
+</div>
+
+<script>
+// ── STATE
+let wb = null, activeSheet = null, currentHTML = '', history = [];
+let selectedView = 'live_kpi';
+
+// ── VIEW SELECTOR
+function selectView(el) {
+  document.querySelectorAll('.view-opt').forEach(v => v.classList.remove('on'));
+  el.classList.add('on');
+  selectedView = el.dataset.val;
+}
+
+// ── FILE
+const drop = document.getElementById('drop');
+drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('over'); });
+drop.addEventListener('dragleave', () => drop.classList.remove('over'));
+drop.addEventListener('drop', e => { e.preventDefault(); drop.classList.remove('over'); loadFile(e.dataTransfer.files[0]); });
+document.getElementById('fin').addEventListener('change', e => loadFile(e.target.files[0]));
+
+function loadFile(f) {
+  if (!f) return;
+  const r = new FileReader();
+  r.onload = e => {
+    try {
+      wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+      document.getElementById('fname').textContent = f.name;
+      document.getElementById('fmeta').textContent = wb.SheetNames.length + ' גיליונות | ' + (f.size / 1024).toFixed(1) + ' KB';
+      document.getElementById('finfo').classList.add('show');
+      buildTabs();
+      ['ssec','csec','vsec','xsec','gsec'].forEach(id => document.getElementById(id).style.display = 'block');
+      const cn = document.getElementById('cname');
+      if (!cn.value) cn.value = f.name.replace(/\.[^.]+$/, '').replace(/[_-]/g, ' ');
+    } catch(err) { showErr('שגיאה בקריאת הקובץ', err.message, 'ודא שהקובץ הוא Excel תקין'); }
+  };
+  r.readAsArrayBuffer(f);
+}
+
+function buildTabs() {
+  const c = document.getElementById('stabs');
+  c.innerHTML = '';
+  wb.SheetNames.forEach((n, i) => {
+    const b = document.createElement('button');
+    b.className = 'stab' + (i === 0 ? ' on' : '');
+    b.textContent = n;
+    b.onclick = () => { document.querySelectorAll('.stab').forEach(t => t.classList.remove('on')); b.classList.add('on'); activeSheet = n; };
+    c.appendChild(b);
+    if (i === 0) activeSheet = n;
+  });
+}
+
+// ── DATA
+function getData(s) {
+  const ws = wb.Sheets[s];
+  const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+  return {
+    headers: (rows[0] || []).slice(0, 14),
+    rows: rows.slice(1, 18).map(r => r.slice(0, 12).map(v => String(v ?? '').slice(0, 40))),
+    totalRows: rows.length - 1
+  };
+}
+
+// ── VIEW PROMPTS
+const viewPrompts = {
+  live_kpi: `LIVE KPI dashboard: animated count-up numbers, 6 KPI cards with glowing borders, interactive bar chart (pure JS, hover tooltips), animated progress bars, live clock updating every second, color-coded status (green/amber/red).`,
+  trend_analysis: `TREND ANALYSIS: line chart over time (pure JS, hover), % change with arrows ↑↓, GROWING/DECLINING/STABLE badges, month-over-month table, one forecast row.`,
+  comparison: `COMPARISON: side-by-side metric cards per period, grouped bar chart (pure JS, hover), delta % column, winner/loser badges, summary verdict card.`,
+  funnel: `FUNNEL: CSS tapering funnel shape, each stage shows count + conversion rate + drop-off %, top recommendation for which stage to fix.`,
+  insights_report: `INSIGHTS REPORT: executive summary (2-3 sentences), 6 insight cards with icon + title + metric + explanation + recommendation, CRITICAL/WARNING/INFO/POSITIVE badges, "מה עבד" and "מה לתקן" sections, next-steps checklist. All Hebrew.`,
+  executive: `EXECUTIVE: minimal clean design, top 3 KPIs large, one-sentence summary, one simple chart, traffic light per KPI (🔴🟡🟢), 3 bold recommendations, one bottom-line. Readable in 60 seconds.`
+};
+
+// ── GENERATE
+async function generate() {
+  if (!wb || !activeSheet) { showErr('לא נטען קובץ', 'אנא העלה קובץ Excel תחילה', ''); return; }
+
+  const btn = document.getElementById('gbtn');
+  btn.classList.add('loading'); btn.disabled = true;
+  clearErr();
+  document.getElementById('res').style.display = 'none';
+  document.getElementById('empty').style.display = 'none';
+  setP(8, 'מחלץ נתונים...');
+
+  const cname = document.getElementById('cname').value || activeSheet;
+  const period = document.getElementById('period').value;
+  const industry = document.getElementById('industry').value;
+  const ctx = document.getElementById('ctx').value;
+  const data = getData(activeSheet);
+  const viewSpec = viewPrompts[selectedView] || viewPrompts.live_kpi;
+
+  const viewNames = { live_kpi:'Live KPI', trend_analysis:'ניתוח מגמות', comparison:'השוואת תקופות', funnel:'משפך המרות', insights_report:'דוח תובנות', executive:'Executive' };
+
+  const prompt = `You are an expert data analyst and frontend developer. Create a stunning HTML dashboard in this EXACT visual style.
+
+REFERENCE CSS (use these exact variables and patterns):
+:root{--bg:#07070e;--surface:#0d0d18;--card:#111120;--border:#1e1e35;--border2:#2a2a45;--accent:#6366f1;--accent2:#818cf8;--green:#22c55e;--green2:#4ade80;--red:#ef4444;--red2:#f87171;--amber:#f59e0b;--amber2:#fbbf24;--cyan:#06b6d4;--text:#e8e8f8;--muted:#9090bb;--dim:#55557a}
+
+EXACT PATTERNS:
+- body::before: grid bg with linear-gradient(var(--border) 1px,transparent 1px) 40px 40px, opacity .25
+- header::after: gradient line linear-gradient(90deg,transparent,var(--accent),var(--cyan),transparent)
+- Animated green dot: @keyframes pulse {0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.8)}}
+- LIVE REPORT badge: border:1px solid var(--green), background:rgba(34,197,94,.08), green text
+- KPI cards: background var(--card), border-top:2px solid [color], hover translateY(-2px)+box-shadow
+  Classes: .g=green border, .r=red border, .a=amber border, .c=cyan border, .p=purple border
+- KPI inner radial: radial-gradient(ellipse at top right,rgba(255,255,255,.03),transparent 60%)
+- Bar chart bars: .bar.n blue gradient, .bar.s amber gradient, .bar.pk red gradient
+- Bar hover tooltip: .btt absolute element, opacity:0 on parent hover opacity:1
+- Chart gridlines: pseudo-elements ::before ::after at 33% and 66% heights
+- Progress bars: 5px height, start width:0, animate after 500ms setTimeout with cubic-bezier(.4,0,.2,1)
+- Panel header: .ph flex with .pt title + .ptag monospace tag (background rgba(99,102,241,.15))
+- Comparison table: .ctbl, color classes .vj=accent2 .vfo=amber2 .vfw=red2 .vd=green2 .vna=dim
+- Insight cards: colored top border 3px, .itag category label, .ival large number, .idsc text, .irec recommendation
+  Types: .al=red(ALERT) .pk=amber(PEAK/STAR) .cs=purple(COST) .tr=green(TREND)
+- Fade-in: .fi {opacity:0;transform:translateY(14px);animation:fu .5s ease forwards}
+  @keyframes fu{to{opacity:1;transform:translateY(0)}}
+- Stagger: .s1{animation-delay:.1s} .s2{.2s} .s3{.3s} .s4{.4s}
+
+CLIENT: "${cname}"
+${period ? `PERIOD: ${period}` : ''}
+${industry ? `INDUSTRY: ${industry}` : ''}
+REPORT TYPE: ${viewNames[selectedView]}
+DATA FROM SHEET "${activeSheet}":
+${JSON.stringify(data)}
+${ctx ? `ADDITIONAL CONTEXT: ${ctx}` : ''}
+
+VIEW-SPECIFIC REQUIREMENTS:
+${viewSpec}
+
+MANDATORY RULES:
+1. Output ONLY complete HTML starting with <!DOCTYPE html> — zero markdown, zero explanations
+2. Apply ALL CSS variables and class patterns from reference above exactly
+3. RTL Hebrew dir="rtl", Google Fonts: Heebo + JetBrains Mono
+4. Use ACTUAL DATA VALUES from the sheet only — no placeholders
+5. Bar chart: build bars with JS loop, each bar gets hover tooltip with exact value
+6. Progress bars: width starts at 0, setTimeout 500ms to animate to real values
+7. All cards use .fi class + stagger delays for fade-in on load
+8. Header: client name + period + animated green pulse dot + LIVE REPORT badge
+9. KPI grid: 6 cards with colored border-top, kpi-lbl + kpi-val + kpi-sub structure
+10. Insight cards: 4+ cards with .itag .ival .idsc .irec, written in professional Hebrew
+11. Include comparison table (.ctbl) if data has multiple periods
+12. Footer: "נוצר על ידי DashGen | ${new Date().toLocaleDateString('he-IL')}"
+13. Fully self-contained — only Google Fonts may be external
+
+Start immediately with <!DOCTYPE html>`;
+
+  try {
+    setP(20, 'שולח ל-Claude AI...');
+
+    const resp = await fetch('/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt })
+    });
+
+    setP(65, 'מקבל תגובה...');
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      const msg = err?.error || `HTTP ${resp.status}`;
+      let hint = '';
+      if (resp.status === 500 && msg.includes('ANTHROPIC_API_KEY'))
+        hint = 'הגדר את ANTHROPIC_API_KEY ב-Vercel → Settings → Environment Variables ואז Redeploy';
+      throw { t: `שגיאת שרת (${resp.status})`, d: msg, h: hint };
+    }
+
+    const json = await resp.json();
+    setP(85, 'מעבד HTML...');
+
+    let html = (json.html || '').trim();
+    if (html.startsWith('```')) html = html.replace(/^```[\w]*\n?/, '').replace(/\n?```\s*$/, '').trim();
+    if (!html.startsWith('<!DOCTYPE') && !html.startsWith('<html')) {
+      const idx = html.indexOf('<!DOCTYPE');
+      if (idx > -1) html = html.slice(idx);
+      else throw { t: 'תגובה לא תקינה', d: 'Claude לא החזיר HTML תקין: ' + html.slice(0, 150), h: 'נסה שוב' };
+    }
+
+    currentHTML = html;
+    setP(100, 'הושלם!');
+    setTimeout(() => document.getElementById('prog').classList.remove('on'), 800);
+
+    showResult(cname, viewNames[selectedView]);
+    addHist(cname, viewNames[selectedView]);
+
+  } catch(e) {
+    if (e?.t) showErr(e.t, e.d, e.h || '');
+    else showErr('שגיאה', e?.message || String(e), '');
+    document.getElementById('prog').classList.remove('on');
+  }
+
+  btn.classList.remove('loading'); btn.disabled = false;
+}
+
+// ── RESULT
+function showResult(name, type) {
+  const blob = new Blob([currentHTML], { type: 'text/html;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  document.getElementById('pframe').src = url;
+  document.getElementById('openBtn').href = url;
+  document.getElementById('rtitle').textContent = name + ' — ' + type;
+  document.getElementById('plbl').textContent = name;
+  document.getElementById('res').style.display = 'block';
+  document.getElementById('res').scrollIntoView({ behavior: 'smooth' });
+}
+
+function dl() {
+  if (!currentHTML) return;
+  const n = (document.getElementById('cname').value || 'report').replace(/[^a-zA-Z0-9\u0590-\u05FF]/g, '_');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([currentHTML], { type: 'text/html' }));
+  a.download = n + '_live_report.html'; a.click();
+}
+
+function copyShareLink() {
+  if (!currentHTML) return;
+  const url = URL.createObjectURL(new Blob([currentHTML], { type: 'text/html' }));
+  navigator.clipboard.writeText(url).then(() => {
+    const btn = event.target;
+    btn.textContent = '✓ הועתק!';
+    setTimeout(() => btn.textContent = '🔗 העתק קישור', 2000);
+  });
+}
+
+// ── HISTORY
+function addHist(name, type) {
+  history.unshift({ id: Date.now(), name, type, html: currentHTML, t: new Date().toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' }) });
+  if (history.length > 8) history.pop();
+  renderHist();
+}
+
+function renderHist() {
+  document.getElementById('hist').classList.add('on');
+  document.getElementById('hlist').innerHTML = history.map(h => `
+    <div class="hitem" onclick="loadH(${h.id})">
+      <div><div class="hn">${h.name}</div><div class="hm">${h.type} | ${h.t}</div></div>
+      <button class="hdl" onclick="event.stopPropagation();dlH(${h.id})">⬇</button>
+    </div>`).join('');
+}
+
+function loadH(id) { const h = history.find(x => x.id === id); if (h) { currentHTML = h.html; showResult(h.name, h.type); } }
+function dlH(id) {
+  const h = history.find(x => x.id === id); if (!h) return;
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([h.html], { type: 'text/html' }));
+  a.download = h.name.replace(/[^a-zA-Z0-9\u0590-\u05FF]/g, '_') + '.html'; a.click();
+}
+
+// ── HELPERS
+function setP(pct, msg) {
+  document.getElementById('prog').classList.add('on');
+  document.getElementById('pfill').style.width = pct + '%';
+  document.getElementById('pmsg').textContent = msg;
+}
+function showErr(t, d, h) {
+  const b = document.getElementById('errbox');
+  document.getElementById('errt').textContent = '⚠ ' + t;
+  document.getElementById('errd').textContent = d;
+  const hel = document.getElementById('errh'); hel.textContent = h; hel.style.display = h ? 'block' : 'none';
+  b.classList.add('on'); b.scrollIntoView({ behavior: 'smooth' });
+}
+function clearErr() { document.getElementById('errbox').classList.remove('on'); }
+</script>
+</body>
+</html>
