@@ -471,64 +471,19 @@ function getData(s) {
   const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
   return {
     headers: (rows[0] || []).slice(0, 14),
-    rows: rows.slice(1, 25).map(r => r.slice(0, 14).map(v => String(v ?? '').slice(0, 50))),
+    rows: rows.slice(1, 18).map(r => r.slice(0, 12).map(v => String(v ?? '').slice(0, 40))),
     totalRows: rows.length - 1
   };
 }
 
 // ── VIEW PROMPTS
 const viewPrompts = {
-  live_kpi: `Create a LIVE KPI dashboard with:
-- Animated counting numbers (count up on load using JS)
-- 6 KPI cards with real-time pulse animations and colored glowing borders
-- An interactive bar/line chart built with pure JS (hover tooltips showing exact values)
-- Animated progress bars that fill on page load
-- A "last updated" timestamp that ticks every second
-- Color-coded status indicators (green=good, amber=warning, red=alert)
-- Sparkline mini-charts inside KPI cards`,
-
-  trend_analysis: `Create a TREND ANALYSIS dashboard with:
-- Multi-line chart showing trends over time (pure JS, interactive hover)
-- Moving average overlay on the chart
-- Week-over-week and month-over-month percentage change indicators with arrows (↑↓)
-- Trend direction badges (GROWING / DECLINING / STABLE) with colored backgrounds
-- A seasonality heatmap table (rows=weeks, cols=days, color intensity=value)
-- Forecast section showing projected next period based on trend`,
-
-  comparison: `Create a COMPARISON dashboard with:
-- Side-by-side metric cards for each time period
-- Grouped bar chart comparing periods (interactive, hover tooltips)
-- Delta column showing absolute and percentage change between periods
-- Winner/loser badges on each metric row
-- A radar/spider chart showing multi-dimensional comparison
-- Summary verdict card: which period performed best and why`,
-
-  funnel: `Create a CONVERSION FUNNEL dashboard with:
-- Visual funnel graphic built with CSS (tapering shapes, not just bars)
-- Each funnel stage shows: count, conversion rate, drop-off rate
-- Color intensity based on performance vs benchmark
-- Drop-off analysis: where are we losing the most people
-- Cost per stage if cost data is available
-- Recommendations for which stage to optimize first`,
-
-  insights_report: `Create an AI INSIGHTS REPORT with:
-- Executive summary paragraph at top (2-3 sentences summarizing the data)
-- 6-8 insight cards each with: icon, title, key metric, explanation (2-3 sentences), and specific actionable recommendation
-- Insight categories: PERFORMANCE, ALERT, OPPORTUNITY, BENCHMARK, TREND, RECOMMENDATION
-- Each insight has a severity level badge (CRITICAL / WARNING / INFO / POSITIVE)
-- "What worked" section and "What needs fixing" section
-- Specific next steps checklist with checkboxes (visual only)
-- All insights written in professional Hebrew`,
-
-  executive: `Create an EXECUTIVE SUMMARY dashboard with:
-- Minimal, ultra-clean design with lots of white space
-- Top 3 most important numbers front and center (very large font)
-- Single-sentence summary of performance vs goal
-- A simple, clean chart (no clutter) - the most important trend only
-- Traffic light status for each main KPI (🔴🟡🟢)
-- 3 strategic recommendations in bold
-- One-line bottom line statement
-- Designed to be read in under 60 seconds`
+  live_kpi: `LIVE KPI dashboard: animated count-up numbers, 6 KPI cards with glowing borders, interactive bar chart (pure JS, hover tooltips), animated progress bars, live clock updating every second, color-coded status (green/amber/red).`,
+  trend_analysis: `TREND ANALYSIS: line chart over time (pure JS, hover), % change with arrows ↑↓, GROWING/DECLINING/STABLE badges, month-over-month table, one forecast row.`,
+  comparison: `COMPARISON: side-by-side metric cards per period, grouped bar chart (pure JS, hover), delta % column, winner/loser badges, summary verdict card.`,
+  funnel: `FUNNEL: CSS tapering funnel shape, each stage shows count + conversion rate + drop-off %, top recommendation for which stage to fix.`,
+  insights_report: `INSIGHTS REPORT: executive summary (2-3 sentences), 6 insight cards with icon + title + metric + explanation + recommendation, CRITICAL/WARNING/INFO/POSITIVE badges, "מה עבד" and "מה לתקן" sections, next-steps checklist. All Hebrew.`,
+  executive: `EXECUTIVE: minimal clean design, top 3 KPIs large, one-sentence summary, one simple chart, traffic light per KPI (🔴🟡🟢), 3 bold recommendations, one bottom-line. Readable in 60 seconds.`
 };
 
 // ── GENERATE
