@@ -23,7 +23,7 @@ export default async function handler(req, res) {
     },
     body: JSON.stringify({
       model: 'claude-sonnet-4-20250514',
-      max_tokens: 6000,
+      max_tokens: 2000,
       messages: [{ role: 'user', content: prompt }],
     }),
   });
@@ -36,6 +36,6 @@ export default async function handler(req, res) {
   }
 
   const data = await response.json();
-  const html = data.content?.find(b => b.type === 'text')?.text || '';
-  return res.status(200).json({ html });
+  const text = data.content?.find(b => b.type === 'text')?.text || '';
+  return res.status(200).json({ text });
 }
