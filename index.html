@@ -3,29 +3,35 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>DashGen — מחולל דשבורדים</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
+<title>DashGen — Live Reports</title>
 <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700;900&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 :root {
-  --bg: #08080f;
-  --s1: #0d0d1a;
-  --s2: #111122;
-  --s3: #161628;
-  --border: #1e1e35;
-  --border2: #282840;
+  --bg: #060610;
+  --panel: #0a0a18;
+  --card: #0e0e20;
+  --card2: #12122a;
+  --border: #1c1c38;
+  --border2: #252545;
   --accent: #6366f1;
-  --accent-glow: rgba(99,102,241,.25);
-  --green: #22c55e;
+  --accent2: #818cf8;
+  --glow: rgba(99,102,241,.2);
+  --green: #10b981;
+  --green2: #34d399;
   --red: #ef4444;
+  --red2: #f87171;
   --amber: #f59e0b;
+  --amber2: #fbbf24;
   --cyan: #06b6d4;
-  --text: #e2e2f2;
-  --muted: #8888aa;
-  --dim: #44445a;
+  --purple: #a855f7;
+  --text: #e2e2f5;
+  --muted: #6b6b99;
+  --dim: #3a3a5c;
 }
+
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
 body {
   font-family: 'Heebo', sans-serif;
   background: var(--bg);
@@ -34,542 +40,557 @@ body {
   overflow-x: hidden;
 }
 
-/* Grid bg */
+/* animated grid bg */
 body::before {
   content: '';
   position: fixed; inset: 0;
   background-image:
-    linear-gradient(var(--border) 1px, transparent 1px),
-    linear-gradient(90deg, var(--border) 1px, transparent 1px);
-  background-size: 44px 44px;
-  opacity: .2;
-  pointer-events: none;
-  z-index: 0;
+    linear-gradient(rgba(99,102,241,.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(99,102,241,.04) 1px, transparent 1px);
+  background-size: 48px 48px;
+  pointer-events: none; z-index: 0;
 }
 
-/* TOPBAR */
+/* glow orb */
+body::after {
+  content: '';
+  position: fixed;
+  top: -200px; right: -200px;
+  width: 600px; height: 600px;
+  background: radial-gradient(circle, rgba(99,102,241,.08) 0%, transparent 70%);
+  pointer-events: none; z-index: 0;
+}
+
+/* ─── TOPBAR ─── */
 .topbar {
   position: relative; z-index: 10;
   display: flex; align-items: center; justify-content: space-between;
-  padding: 18px 32px;
+  padding: 0 28px;
+  height: 56px;
+  background: rgba(10,10,24,.9);
   border-bottom: 1px solid var(--border2);
-  background: var(--s1);
+  backdrop-filter: blur(12px);
 }
 .topbar::after {
   content: '';
   position: absolute; bottom: 0; left: 0; right: 0; height: 1px;
   background: linear-gradient(90deg, transparent, var(--accent), var(--cyan), transparent);
 }
-.logo { display: flex; align-items: center; gap: 12px; }
-.logo-icon {
-  width: 34px; height: 34px; border-radius: 8px;
-  background: linear-gradient(135deg, var(--accent), #a855f7);
+.logo { display: flex; align-items: center; gap: 10px; }
+.logo-mark {
+  width: 30px; height: 30px; border-radius: 8px;
+  background: linear-gradient(135deg, var(--accent), var(--purple));
   display: flex; align-items: center; justify-content: center;
-  font-size: 18px; flex-shrink: 0;
+  font-size: 15px; flex-shrink: 0;
+  box-shadow: 0 0 16px var(--glow);
 }
 .logo-text { font-size: 17px; font-weight: 900; color: #fff; letter-spacing: -.03em; }
-.logo-text span { color: #818cf8; }
-.logo-sub { font-size: 11px; color: var(--muted); margin-top: 1px; }
-.topbar-right { display: flex; align-items: center; gap: 14px; }
-.badge-version {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 10px; color: var(--muted);
-  background: var(--s3); border: 1px solid var(--border2);
-  padding: 3px 10px; border-radius: 99px;
-}
+.logo-text span { color: var(--accent2); }
+.logo-sub { font-size: 10px; color: var(--muted); font-family: 'JetBrains Mono', monospace; }
 
-/* LAYOUT */
+.topbar-right { display: flex; align-items: center; gap: 10px; }
+.live-badge {
+  display: flex; align-items: center; gap: 5px;
+  padding: 4px 10px; border-radius: 99px;
+  background: rgba(16,185,129,.08);
+  border: 1px solid rgba(16,185,129,.25);
+  font-size: 10px; font-weight: 700; color: var(--green2);
+  font-family: 'JetBrains Mono', monospace; letter-spacing: .08em;
+}
+.live-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--green2);
+  box-shadow: 0 0 6px var(--green2);
+  animation: blink 2s ease-in-out infinite;
+}
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+/* ─── LAYOUT ─── */
 .layout {
   position: relative; z-index: 1;
   display: grid;
-  grid-template-columns: 340px 1fr;
-  min-height: calc(100vh - 61px);
+  grid-template-columns: 290px 1fr;
+  min-height: calc(100vh - 56px);
 }
-@media(max-width: 900px) { .layout { grid-template-columns: 1fr; } }
+@media(max-width:720px){ .layout { grid-template-columns: 1fr; } }
 
-/* SIDEBAR */
+/* ─── SIDEBAR ─── */
 .sidebar {
-  background: var(--s1);
+  background: var(--panel);
   border-left: 1px solid var(--border2);
-  padding: 28px 24px;
-  display: flex; flex-direction: column; gap: 24px;
-  position: sticky; top: 61px; height: calc(100vh - 61px);
+  padding: 22px 16px;
+  display: flex; flex-direction: column; gap: 22px;
   overflow-y: auto;
+  max-height: calc(100vh - 56px);
 }
 
-.section-label {
-  font-size: 10px; font-weight: 700; letter-spacing: .12em;
+.sec-label {
+  font-size: 9px; font-weight: 700; letter-spacing: .14em;
   text-transform: uppercase; color: var(--muted);
-  margin-bottom: 10px;
+  margin-bottom: 9px;
 }
 
-/* DROP ZONE */
-.dropzone {
+/* ─── DROPZONE ─── */
+.drop {
   border: 2px dashed var(--border2);
-  border-radius: 14px;
-  padding: 28px 20px;
-  text-align: center;
-  cursor: pointer;
-  transition: all .2s;
-  background: var(--s2);
-  position: relative;
-  overflow: hidden;
+  border-radius: 12px; padding: 22px 14px;
+  text-align: center; cursor: pointer;
+  position: relative; transition: .2s;
+  background: var(--card);
 }
-.dropzone:hover, .dropzone.drag { border-color: var(--accent); background: rgba(99,102,241,.06); box-shadow: 0 0 24px var(--accent-glow); }
-.dropzone-icon { font-size: 32px; margin-bottom: 10px; }
-.dropzone-title { font-size: 14px; font-weight: 700; color: #fff; margin-bottom: 5px; }
-.dropzone-sub { font-size: 12px; color: var(--muted); line-height: 1.5; }
-.dropzone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
-
-/* FILE INFO */
-.file-info {
-  background: var(--s2); border: 1px solid var(--border2);
-  border-radius: 10px; padding: 14px;
-  display: none;
+.drop:hover,.drop.over {
+  border-color: var(--accent);
+  background: rgba(99,102,241,.05);
+  box-shadow: 0 0 20px var(--glow);
 }
-.file-info.show { display: block; }
-.file-name { font-size: 13px; font-weight: 700; color: #fff; margin-bottom: 4px; word-break: break-all; }
-.file-meta { font-size: 11px; color: var(--muted); font-family: 'JetBrains Mono', monospace; }
+.drop input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.drop-icon { font-size: 26px; margin-bottom: 7px; }
+.drop-t { font-size: 13px; font-weight: 700; color: #fff; margin-bottom: 3px; }
+.drop-s { font-size: 11px; color: var(--muted); }
 
-/* SHEET TABS */
-.sheet-tabs { display: flex; flex-wrap: wrap; gap: 7px; }
-.sheet-tab {
-  padding: 5px 12px; border-radius: 6px;
-  border: 1px solid var(--border2);
-  background: var(--s2); color: var(--muted);
-  font-size: 12px; cursor: pointer; transition: all .15s;
+.finfo { background: var(--card); border: 1px solid var(--border2); border-radius: 8px; padding: 10px 12px; display: none; }
+.finfo.show { display: block; }
+.finfo-name { font-size: 12px; font-weight: 700; color: #fff; word-break: break-all; margin-bottom: 2px; }
+.finfo-meta { font-size: 10px; color: var(--muted); font-family: 'JetBrains Mono', monospace; }
+
+/* ─── SHEET TABS ─── */
+.stabs { display: flex; flex-wrap: wrap; gap: 5px; }
+.stab {
+  padding: 4px 10px; border-radius: 5px;
+  border: 1px solid var(--border2); background: var(--card);
+  color: var(--muted); font-size: 11px; cursor: pointer;
+  font-family: 'Heebo', sans-serif; transition: .15s;
 }
-.sheet-tab:hover { border-color: var(--accent); color: var(--text); }
-.sheet-tab.active { border-color: var(--accent); background: rgba(99,102,241,.15); color: #818cf8; font-weight: 700; }
+.stab:hover { border-color: var(--accent); color: var(--text); }
+.stab.on { border-color: var(--accent); background: rgba(99,102,241,.12); color: var(--accent2); font-weight: 700; }
 
-/* SELECT */
-.field-group { display: flex; flex-direction: column; gap: 8px; }
-.field-label { font-size: 12px; color: var(--muted); }
-select, textarea {
-  width: 100%;
-  background: var(--s2); border: 1px solid var(--border2);
+/* ─── FIELDS ─── */
+.field { display: flex; flex-direction: column; gap: 5px; }
+.field label { font-size: 11px; color: var(--muted); }
+.field input, .field select, .field textarea {
+  width: 100%; background: var(--card); border: 1px solid var(--border2);
   color: var(--text); border-radius: 8px;
   font-family: 'Heebo', sans-serif; font-size: 13px;
-  padding: 9px 12px; outline: none;
-  transition: border-color .15s;
+  padding: 8px 11px; outline: none; transition: .15s;
 }
-select:focus, textarea:focus { border-color: var(--accent); }
-textarea { min-height: 72px; resize: vertical; }
+.field input:focus,.field select:focus,.field textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--glow); }
+.field textarea { min-height: 56px; resize: vertical; }
 
-/* GENERATE BTN */
-.gen-btn {
-  width: 100%; padding: 14px;
-  border-radius: 10px; border: none;
-  background: linear-gradient(135deg, var(--accent), #a855f7);
-  color: #fff; font-size: 15px; font-weight: 700;
+/* view type grid */
+.view-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.view-opt {
+  padding: 8px 6px; border-radius: 8px;
+  border: 1px solid var(--border2); background: var(--card);
+  color: var(--muted); font-size: 11px; cursor: pointer;
+  font-family: 'Heebo', sans-serif; transition: .15s;
+  text-align: center; line-height: 1.4;
+}
+.view-opt:hover { border-color: var(--accent); color: var(--text); }
+.view-opt.on { border-color: var(--accent); background: rgba(99,102,241,.12); color: var(--accent2); font-weight: 700; }
+.view-opt .vo-icon { font-size: 16px; display: block; margin-bottom: 3px; }
+
+/* ─── GEN BUTTON ─── */
+.genbtn {
+  width: 100%; padding: 13px; border-radius: 10px; border: none;
+  background: linear-gradient(135deg, var(--accent), var(--purple));
+  color: #fff; font-size: 14px; font-weight: 700;
   cursor: pointer; font-family: 'Heebo', sans-serif;
-  letter-spacing: .01em;
-  box-shadow: 0 4px 20px var(--accent-glow);
-  transition: all .2s; position: relative; overflow: hidden;
+  transition: .2s; position: relative; overflow: hidden;
+  box-shadow: 0 4px 20px var(--glow);
 }
-.gen-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 28px var(--accent-glow); }
-.gen-btn:disabled { background: var(--s3); color: var(--muted); box-shadow: none; cursor: not-allowed; transform: none; }
-.gen-btn .spinner {
-  display: none; width: 16px; height: 16px;
-  border: 2px solid rgba(255,255,255,.3); border-top-color: #fff;
-  border-radius: 50%; animation: spin .7s linear infinite;
-  margin: 0 auto;
+.genbtn::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: linear-gradient(135deg, transparent, rgba(255,255,255,.1), transparent);
+  transform: translateX(-100%); transition: transform .5s;
 }
-.gen-btn.loading .btn-text { display: none; }
-.gen-btn.loading .spinner { display: block; }
+.genbtn:hover:not(:disabled)::before { transform: translateX(100%); }
+.genbtn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 8px 28px var(--glow); }
+.genbtn:disabled { background: var(--card2); color: var(--muted); cursor: not-allowed; box-shadow: none; transform: none; }
+.spin { display: none; width: 15px; height: 15px; border: 2px solid rgba(255,255,255,.25); border-top-color: #fff; border-radius: 50%; animation: spin .7s linear infinite; margin: 0 auto; }
+.genbtn.loading .btxt { display: none; }
+.genbtn.loading .spin { display: block; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* PROGRESS */
-.progress-wrap { display: none; }
-.progress-wrap.show { display: block; }
-.progress-bar { height: 3px; background: var(--border2); border-radius: 3px; overflow: hidden; margin-bottom: 8px; }
-.progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent), #a855f7); border-radius: 3px; transition: width .4s ease; width: 0%; }
-.progress-msg { font-size: 11px; color: var(--muted); font-family: 'JetBrains Mono', monospace; }
+/* progress */
+.prog { display: none; margin-top: 8px; }
+.prog.on { display: block; }
+.pbar { height: 2px; background: var(--border2); border-radius: 2px; overflow: hidden; margin-bottom: 5px; }
+.pfill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--purple), var(--cyan)); background-size: 200% 100%; animation: shimmer 1.5s linear infinite; transition: width .4s ease; width: 0; }
+@keyframes shimmer { 0%{background-position:100% 0} 100%{background-position:-100% 0} }
+.pmsg { font-size: 10px; color: var(--muted); font-family: 'JetBrains Mono', monospace; }
 
-/* MAIN CONTENT */
-.main { padding: 32px; background: var(--bg); }
-@media(max-width: 900px) { .main { padding: 20px; } }
+/* ─── MAIN ─── */
+.main { padding: 24px; overflow-y: auto; }
 
-/* EMPTY STATE */
-.empty-state {
-  display: flex; flex-direction: column;
-  align-items: center; justify-content: center;
-  min-height: 60vh; text-align: center; gap: 16px;
+.empty {
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; min-height: 58vh;
+  text-align: center; gap: 12px;
 }
-.empty-icon { font-size: 56px; opacity: .3; }
-.empty-title { font-size: 22px; font-weight: 700; color: var(--muted); }
-.empty-sub { font-size: 14px; color: var(--dim); max-width: 360px; line-height: 1.6; }
+.empty-icon { font-size: 48px; opacity: .25; }
+.empty-t { font-size: 21px; font-weight: 700; color: var(--muted); }
+.empty-s { font-size: 13px; color: var(--dim); max-width: 300px; line-height: 1.6; }
 
-/* STATUS */
-.status-box {
-  padding: 12px 16px; border-radius: 10px;
-  font-size: 13px; line-height: 1.5; margin-bottom: 20px;
-  display: none;
-}
-.status-box.show { display: block; }
-.status-box.error { background: rgba(239,68,68,.1); border: 1px solid rgba(239,68,68,.3); color: #f87171; }
-.status-box.success { background: rgba(34,197,94,.1); border: 1px solid rgba(34,197,94,.3); color: #4ade80; }
+/* error */
+.errbox { background: rgba(239,68,68,.07); border: 1px solid rgba(239,68,68,.25); border-radius: 10px; padding: 14px 16px; margin-bottom: 16px; display: none; }
+.errbox.on { display: block; }
+.err-t { font-size: 13px; font-weight: 700; color: var(--red2); margin-bottom: 4px; }
+.err-d { font-size: 12px; color: var(--red2); font-family: 'JetBrains Mono', monospace; line-height: 1.6; word-break: break-all; }
+.err-h { font-size: 11px; color: var(--muted); margin-top: 7px; padding-top: 7px; border-top: 1px solid rgba(239,68,68,.15); line-height: 1.5; }
 
-/* RESULT */
-.result-header {
-  display: flex; align-items: center; justify-content: space-between;
-  flex-wrap: wrap; gap: 12px; margin-bottom: 20px;
-}
-.result-title { font-size: 18px; font-weight: 700; color: #fff; }
-.result-actions { display: flex; gap: 10px; flex-wrap: wrap; }
-.btn {
-  padding: 8px 18px; border-radius: 8px;
-  font-size: 13px; font-weight: 700; cursor: pointer;
-  font-family: 'Heebo', sans-serif; transition: all .15s;
-  display: inline-flex; align-items: center; gap: 7px;
-  text-decoration: none;
-}
-.btn-primary { background: var(--green); color: #000; border: none; }
-.btn-primary:hover { background: #4ade80; }
-.btn-outline { background: transparent; color: var(--muted); border: 1px solid var(--border2); }
-.btn-outline:hover { border-color: var(--accent); color: var(--text); }
-.btn-copy { background: transparent; color: #818cf8; border: 1px solid rgba(99,102,241,.4); }
-.btn-copy:hover { background: rgba(99,102,241,.1); }
+/* result */
+.rhdr { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; }
+.rtitle { font-size: 17px; font-weight: 900; color: #fff; display: flex; align-items: center; gap: 8px; }
+.rtitle-badge { font-size: 10px; padding: 3px 9px; border-radius: 99px; background: rgba(16,185,129,.1); border: 1px solid rgba(16,185,129,.25); color: var(--green2); font-family: 'JetBrains Mono', monospace; font-weight: 700; letter-spacing: .07em; }
+.rbtns { display: flex; gap: 7px; flex-wrap: wrap; }
+.btn { padding: 8px 15px; border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer; font-family: 'Heebo', sans-serif; transition: .15s; text-decoration: none; display: inline-flex; align-items: center; gap: 5px; border: none; }
+.btn-green { background: var(--green); color: #000; }
+.btn-green:hover { background: var(--green2); }
+.btn-ghost { background: transparent; border: 1px solid var(--border2); color: var(--muted); }
+.btn-ghost:hover { border-color: var(--accent2); color: var(--accent2); }
+.btn-accent { background: transparent; border: 1px solid rgba(99,102,241,.4); color: var(--accent2); }
+.btn-accent:hover { background: rgba(99,102,241,.08); }
 
-/* PREVIEW */
-.preview-wrap {
-  background: var(--s1); border: 1px solid var(--border2);
-  border-radius: 14px; overflow: hidden;
-}
-.preview-bar {
-  padding: 10px 16px; background: var(--s2);
-  border-bottom: 1px solid var(--border2);
-  display: flex; align-items: center; gap: 8px;
-}
-.preview-dot { width: 10px; height: 10px; border-radius: 50%; }
-.preview-iframe {
-  width: 100%; height: 70vh; border: none;
-  background: #07070e;
-}
+/* preview */
+.pwrap { background: var(--card); border: 1px solid var(--border2); border-radius: 14px; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,.4); }
+.pbar2 { padding: 10px 14px; background: var(--panel); border-bottom: 1px solid var(--border2); display: flex; align-items: center; gap: 7px; }
+.pdot { width: 9px; height: 9px; border-radius: 50%; }
+.plbl { font-size: 11px; color: var(--muted); font-family: 'JetBrains Mono', monospace; margin-right: 8px; }
+.pframe { width: 100%; height: 70vh; border: none; background: var(--bg); }
 
-/* HISTORY */
-.history-list { display: flex; flex-direction: column; gap: 8px; margin-top: 24px; }
-.history-item {
-  background: var(--s2); border: 1px solid var(--border2);
-  border-radius: 10px; padding: 12px 14px;
-  display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  cursor: pointer; transition: all .15s;
-}
-.history-item:hover { border-color: var(--accent); }
-.history-name { font-size: 13px; font-weight: 700; color: #fff; }
-.history-meta { font-size: 11px; color: var(--muted); margin-top: 2px; font-family: 'JetBrains Mono', monospace; }
-.history-btn {
-  font-size: 11px; padding: 4px 10px; border-radius: 6px;
-  border: 1px solid var(--border2); background: transparent;
-  color: var(--muted); cursor: pointer; font-family: 'Heebo', sans-serif;
-  white-space: nowrap; transition: all .15s; flex-shrink: 0;
-}
-.history-btn:hover { border-color: var(--green); color: var(--green); }
-
-/* ALERTS */
-.alert {
-  padding: 10px 14px; border-radius: 8px; font-size: 12px; line-height: 1.5;
-  background: rgba(245,158,11,.08); border: 1px solid rgba(245,158,11,.25);
-  color: #fbbf24;
-}
-
-/* SCROLLBAR */
-::-webkit-scrollbar { width: 5px; height: 5px; }
-::-webkit-scrollbar-track { background: var(--s1); }
-::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
-
-/* FADE */
-.fade-in { animation: fadeIn .4s ease; }
-@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+/* history */
+.hist { margin-top: 24px; padding-top: 18px; border-top: 1px solid var(--border); display: none; }
+.hist.on { display: block; }
+.hlbl { font-size: 9px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
+.hlist { display: flex; flex-direction: column; gap: 6px; }
+.hitem { background: var(--card); border: 1px solid var(--border2); border-radius: 8px; padding: 10px 12px; display: flex; align-items: center; justify-content: space-between; gap: 10px; cursor: pointer; transition: .15s; }
+.hitem:hover { border-color: var(--accent); box-shadow: 0 0 12px var(--glow); }
+.hn { font-size: 12px; font-weight: 700; color: #fff; }
+.hm { font-size: 10px; color: var(--muted); font-family: 'JetBrains Mono', monospace; margin-top: 1px; }
+.hdl { font-size: 11px; padding: 4px 9px; border-radius: 5px; border: 1px solid var(--border2); background: transparent; color: var(--muted); cursor: pointer; font-family: 'Heebo', sans-serif; transition: .15s; flex-shrink: 0; }
+.hdl:hover { border-color: var(--green); color: var(--green); }
 </style>
 </head>
 <body>
 
-<nav class="topbar">
+<div class="topbar">
   <div class="logo">
-    <div class="logo-icon">📊</div>
+    <div class="logo-mark">📊</div>
     <div>
       <div class="logo-text">Dash<span>Gen</span></div>
-      <div class="logo-sub">מחולל דשבורדים אוטומטי</div>
+      <div class="logo-sub">AI-POWERED LIVE REPORTS</div>
     </div>
   </div>
   <div class="topbar-right">
-    <span class="badge-version">v1.0</span>
+    <div class="live-badge"><div class="live-dot"></div>LIVE</div>
   </div>
-</nav>
-
-<div class="layout">
-
-  <!-- SIDEBAR -->
-  <aside class="sidebar">
-
-    <!-- Upload -->
-    <div>
-      <div class="section-label">1. העלאת קובץ</div>
-      <div class="dropzone" id="dropzone">
-        <input type="file" id="fileInput" accept=".xlsx,.xls,.csv">
-        <div class="dropzone-icon">📁</div>
-        <div class="dropzone-title">גרור קובץ לכאן</div>
-        <div class="dropzone-sub">Excel, Google Sheets (.xlsx .xls .csv)<br>או לחץ לבחירה</div>
-      </div>
-      <div class="file-info" id="fileInfo">
-        <div class="file-name" id="fileName"></div>
-        <div class="file-meta" id="fileMeta"></div>
-      </div>
-    </div>
-
-    <!-- Sheets -->
-    <div id="sheetSection" style="display:none">
-      <div class="section-label">2. בחירת גיליון</div>
-      <div class="sheet-tabs" id="sheetTabs"></div>
-    </div>
-
-    <!-- Config -->
-    <div id="configSection" style="display:none">
-      <div class="section-label">3. הגדרות דשבורד</div>
-      <div class="field-group" style="margin-bottom:12px">
-        <label class="field-label">שם הלקוח / הדוח</label>
-        <input type="text" id="clientName" placeholder="לדוגמה: ENAV, חברת ABC..."
-          style="background:var(--s2);border:1px solid var(--border2);color:var(--text);border-radius:8px;font-family:'Heebo',sans-serif;font-size:13px;padding:9px 12px;outline:none;width:100%;transition:border-color .15s"
-          onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border2)'">
-      </div>
-      <div class="field-group" style="margin-bottom:12px">
-        <label class="field-label">סוג דשבורד</label>
-        <select id="dashType">
-          <option value="summary">📋 סיכום KPI מרכזי</option>
-          <option value="comparison">📊 השוואה בין תקופות</option>
-          <option value="flow">→ תרשים זרימה / תהליך</option>
-          <option value="timeline">📅 ציר זמן / רודמאפ</option>
-          <option value="hierarchy">🌿 היררכיה / עץ</option>
-        </select>
-      </div>
-      <div class="field-group">
-        <label class="field-label">הקשר נוסף (אופציונלי)</label>
-        <textarea id="context" placeholder="לדוגמה: התמקד ב-Q3, הדגש ירידות, השווה מול יעד..."></textarea>
-      </div>
-    </div>
-
-    <!-- Generate -->
-    <div id="genSection" style="display:none">
-      <button class="gen-btn" id="genBtn" onclick="generate()">
-        <span class="btn-text">✨ צור דשבורד</span>
-        <div class="spinner"></div>
-      </button>
-      <div class="progress-wrap" id="progressWrap">
-        <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
-        <div class="progress-msg" id="progressMsg">מנתח נתונים...</div>
-      </div>
-    </div>
-
-    <div class="alert" style="font-size:11px;line-height:1.6">
-      ✅ <strong>מוכן לשימוש</strong><br>
-      מפתח ה-API מוגדר בשרת.<br>
-      אין צורך בהגדרות נוספות.
-    </div>
-
-  </aside>
-
-  <!-- MAIN -->
-  <main class="main" id="mainContent">
-
-    <!-- Empty state -->
-    <div class="empty-state" id="emptyState">
-      <div class="empty-icon">📊</div>
-      <div class="empty-title">מוכן ליצור דשבורד</div>
-      <div class="empty-sub">העלה קובץ Excel או Google Sheets בצד שמאל, בחר גיליון ולחץ על "צור דשבורד"</div>
-    </div>
-
-    <!-- Status -->
-    <div class="status-box" id="statusBox"></div>
-
-    <!-- Result -->
-    <div id="resultArea" style="display:none" class="fade-in">
-      <div class="result-header">
-        <div class="result-title" id="resultTitle">דשבורד מוכן</div>
-        <div class="result-actions">
-          <button class="btn btn-copy" id="copyLinkBtn" onclick="copyLink()">🔗 העתק קישור</button>
-          <button class="btn btn-outline" onclick="downloadHTML()">⬇ הורד HTML</button>
-          <a class="btn btn-primary" id="openBtn" target="_blank">↗ פתח בטאב חדש</a>
-        </div>
-      </div>
-      <div class="preview-wrap">
-        <div class="preview-bar">
-          <div class="preview-dot" style="background:#ef4444"></div>
-          <div class="preview-dot" style="background:#f59e0b"></div>
-          <div class="preview-dot" style="background:#22c55e"></div>
-          <span style="font-size:11px;color:var(--muted);font-family:'JetBrains Mono',monospace;margin-right:10px" id="previewUrl">תצוגה מקדימה</span>
-        </div>
-        <iframe id="previewFrame" class="preview-iframe"></iframe>
-      </div>
-    </div>
-
-    <!-- History -->
-    <div id="historyArea" style="display:none">
-      <div style="margin-top:32px;padding-top:24px;border-top:1px solid var(--border2)">
-        <div style="font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:14px">דשבורדים שנוצרו בסשן הזה</div>
-        <div class="history-list" id="historyList"></div>
-      </div>
-    </div>
-
-  </main>
 </div>
 
+<div class="layout">
+<aside class="sidebar">
 
+  <div>
+    <div class="sec-label">1. העלאת קובץ</div>
+    <div class="drop" id="drop">
+      <input type="file" id="fin" accept=".xlsx,.xls,.csv">
+      <div class="drop-icon">📁</div>
+      <div class="drop-t">גרור קובץ Excel</div>
+      <div class="drop-s">.xlsx  .xls  .csv</div>
+    </div>
+    <div class="finfo" id="finfo">
+      <div class="finfo-name" id="fname"></div>
+      <div class="finfo-meta" id="fmeta"></div>
+    </div>
+  </div>
+
+  <div id="ssec" style="display:none">
+    <div class="sec-label">2. בחירת גיליון</div>
+    <div class="stabs" id="stabs"></div>
+  </div>
+
+  <div id="csec" style="display:none">
+    <div class="sec-label">3. פרטי הדוח</div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div class="field">
+        <label>שם לקוח / קמפיין</label>
+        <input type="text" id="cname" placeholder="לדוגמה: ENAV, חברת ABC...">
+      </div>
+      <div class="field">
+        <label>תקופת הדוח</label>
+        <input type="text" id="period" placeholder="לדוגמה: פברואר 2026, Q1...">
+      </div>
+      <div class="field">
+        <label>תחום / ענף</label>
+        <input type="text" id="industry" placeholder="לדוגמה: נדל&quot;ן, אי-קומרס...">
+      </div>
+    </div>
+  </div>
+
+  <div id="vsec" style="display:none">
+    <div class="sec-label">4. סוג תצוגה</div>
+    <div class="view-grid" id="viewGrid">
+      <div class="view-opt on" data-val="live_kpi" onclick="selectView(this)">
+        <span class="vo-icon">⚡</span>Live KPI
+      </div>
+      <div class="view-opt" data-val="trend_analysis" onclick="selectView(this)">
+        <span class="vo-icon">📈</span>ניתוח מגמות
+      </div>
+      <div class="view-opt" data-val="comparison" onclick="selectView(this)">
+        <span class="vo-icon">⚖️</span>השוואת תקופות
+      </div>
+      <div class="view-opt" data-val="funnel" onclick="selectView(this)">
+        <span class="vo-icon">🔽</span>משפך המרות
+      </div>
+      <div class="view-opt" data-val="insights_report" onclick="selectView(this)">
+        <span class="vo-icon">🧠</span>דוח תובנות
+      </div>
+      <div class="view-opt" data-val="executive" onclick="selectView(this)">
+        <span class="vo-icon">👔</span>Executive
+      </div>
+    </div>
+  </div>
+
+  <div id="xsec" style="display:none">
+    <div class="sec-label">5. הקשר נוסף (אופציונלי)</div>
+    <div class="field">
+      <textarea id="ctx" placeholder="יעדים, נקודות דגש, מה חשוב להציג..."></textarea>
+    </div>
+  </div>
+
+  <div id="gsec" style="display:none">
+    <button class="genbtn" id="gbtn" onclick="generate()">
+      <span class="btxt">✨ צור דוח Live</span>
+      <div class="spin"></div>
+    </button>
+    <div class="prog" id="prog">
+      <div class="pbar"><div class="pfill" id="pfill"></div></div>
+      <div class="pmsg" id="pmsg"></div>
+    </div>
+  </div>
+
+</aside>
+
+<main class="main">
+  <div class="empty" id="empty">
+    <div class="empty-icon">📊</div>
+    <div class="empty-t">מוכן ליצור דוח Live</div>
+    <div class="empty-s">העלה קובץ Excel, בחר סוג תצוגה ולחץ "צור דוח Live"</div>
+  </div>
+
+  <div class="errbox" id="errbox">
+    <div class="err-t" id="errt"></div>
+    <div class="err-d" id="errd"></div>
+    <div class="err-h" id="errh"></div>
+  </div>
+
+  <div id="res" style="display:none">
+    <div class="rhdr">
+      <div class="rtitle">
+        <span id="rtitle">דוח מוכן</span>
+        <span class="rtitle-badge">LIVE</span>
+      </div>
+      <div class="rbtns">
+        <button class="btn btn-ghost" onclick="dl()">⬇ הורד HTML</button>
+        <a class="btn btn-accent" id="openBtn" target="_blank">↗ פתח בטאב</a>
+        <button class="btn btn-green" onclick="copyShareLink()">🔗 העתק קישור</button>
+      </div>
+    </div>
+    <div class="pwrap">
+      <div class="pbar2">
+        <div class="pdot" style="background:#ef4444"></div>
+        <div class="pdot" style="background:#f59e0b"></div>
+        <div class="pdot" style="background:#22c55e"></div>
+        <span class="plbl" id="plbl">תצוגה מקדימה</span>
+        <div class="live-badge" style="margin-right:auto"><div class="live-dot"></div>LIVE PREVIEW</div>
+      </div>
+      <iframe class="pframe" id="pframe"></iframe>
+    </div>
+  </div>
+
+  <div class="hist" id="hist">
+    <div class="hlbl">דוחות שנוצרו בסשן זה</div>
+    <div class="hlist" id="hlist"></div>
+  </div>
+</main>
+</div>
 
 <script>
-// ── STATE ──────────────────────────────────────────────────────
-let workbook = null;
-let activeSheet = null;
-let generatedHTML = '';
-let history = [];
-let generatedBlob = null;
+// ── STATE
+let wb = null, activeSheet = null, currentHTML = '', history = [];
+let selectedView = 'live_kpi';
 
-// ── FILE HANDLING ──────────────────────────────────────────────
-const dropzone = document.getElementById('dropzone');
-const fileInput = document.getElementById('fileInput');
-
-dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('drag'); });
-dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag'));
-dropzone.addEventListener('drop', e => {
-  e.preventDefault(); dropzone.classList.remove('drag');
-  const f = e.dataTransfer.files[0];
-  if (f) handleFile(f);
-});
-fileInput.addEventListener('change', e => { if (e.target.files[0]) handleFile(e.target.files[0]); });
-
-function handleFile(file) {
-  const reader = new FileReader();
-  reader.onload = e => {
-    try {
-      const data = new Uint8Array(e.target.result);
-      workbook = XLSX.read(data, { type: 'array' });
-
-      // UI updates
-      document.getElementById('fileName').textContent = file.name;
-      document.getElementById('fileMeta').textContent =
-        `${workbook.SheetNames.length} גיליונות  |  ${(file.size/1024).toFixed(1)} KB`;
-      document.getElementById('fileInfo').classList.add('show');
-
-      renderSheetTabs();
-      document.getElementById('sheetSection').style.display = 'block';
-      document.getElementById('configSection').style.display = 'block';
-      document.getElementById('genSection').style.display = 'block';
-
-      // Auto-fill client name from filename
-      const nameInput = document.getElementById('clientName');
-      if (!nameInput.value) {
-        nameInput.value = file.name.replace(/\.[^.]+$/, '').replace(/[_\-]/g, ' ');
-      }
-    } catch(err) {
-      showStatus('error', 'שגיאה בקריאת הקובץ: ' + err.message);
-    }
-  };
-  reader.readAsArrayBuffer(file);
+// ── VIEW SELECTOR
+function selectView(el) {
+  document.querySelectorAll('.view-opt').forEach(v => v.classList.remove('on'));
+  el.classList.add('on');
+  selectedView = el.dataset.val;
 }
 
-function renderSheetTabs() {
-  const tabs = document.getElementById('sheetTabs');
-  tabs.innerHTML = '';
-  workbook.SheetNames.forEach((name, i) => {
-    const btn = document.createElement('button');
-    btn.className = 'sheet-tab' + (i === 0 ? ' active' : '');
-    btn.textContent = name;
-    btn.onclick = () => {
-      document.querySelectorAll('.sheet-tab').forEach(t => t.classList.remove('active'));
-      btn.classList.add('active');
-      activeSheet = name;
-    };
-    tabs.appendChild(btn);
-    if (i === 0) activeSheet = name;
+// ── FILE
+const drop = document.getElementById('drop');
+drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('over'); });
+drop.addEventListener('dragleave', () => drop.classList.remove('over'));
+drop.addEventListener('drop', e => { e.preventDefault(); drop.classList.remove('over'); loadFile(e.dataTransfer.files[0]); });
+document.getElementById('fin').addEventListener('change', e => loadFile(e.target.files[0]));
+
+function loadFile(f) {
+  if (!f) return;
+  const r = new FileReader();
+  r.onload = e => {
+    try {
+      wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+      document.getElementById('fname').textContent = f.name;
+      document.getElementById('fmeta').textContent = wb.SheetNames.length + ' גיליונות | ' + (f.size / 1024).toFixed(1) + ' KB';
+      document.getElementById('finfo').classList.add('show');
+      buildTabs();
+      ['ssec','csec','vsec','xsec','gsec'].forEach(id => document.getElementById(id).style.display = 'block');
+      const cn = document.getElementById('cname');
+      if (!cn.value) cn.value = f.name.replace(/\.[^.]+$/, '').replace(/[_-]/g, ' ');
+    } catch(err) { showErr('שגיאה בקריאת הקובץ', err.message, 'ודא שהקובץ הוא Excel תקין'); }
+  };
+  r.readAsArrayBuffer(f);
+}
+
+function buildTabs() {
+  const c = document.getElementById('stabs');
+  c.innerHTML = '';
+  wb.SheetNames.forEach((n, i) => {
+    const b = document.createElement('button');
+    b.className = 'stab' + (i === 0 ? ' on' : '');
+    b.textContent = n;
+    b.onclick = () => { document.querySelectorAll('.stab').forEach(t => t.classList.remove('on')); b.classList.add('on'); activeSheet = n; };
+    c.appendChild(b);
+    if (i === 0) activeSheet = n;
   });
 }
 
-// ── DATA EXTRACTION ────────────────────────────────────────────
-function extractSheetData(sheetName) {
-  const ws = workbook.Sheets[sheetName];
+// ── DATA
+function getData(s) {
+  const ws = wb.Sheets[s];
   const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
-  const headers = (rows[0] || []).slice(0, 14);
-  const sampleRows = rows.slice(1, 22).map(r =>
-    r.slice(0, 14).map(v => {
-      if (v instanceof Date) return v.toLocaleDateString('he-IL');
-      const s = String(v ?? '');
-      return s.length > 40 ? s.slice(0, 40) + '…' : s;
-    })
-  );
-  return { headers, sampleRows, totalRows: rows.length - 1 };
+  return {
+    headers: (rows[0] || []).slice(0, 14),
+    rows: rows.slice(1, 25).map(r => r.slice(0, 14).map(v => String(v ?? '').slice(0, 50))),
+    totalRows: rows.length - 1
+  };
 }
 
-// ── REPAIR JSON ────────────────────────────────────────────────
-function repairJSON(raw) {
-  let s = raw.trim()
-    .replace(/^```[\w]*\s*/i, '')
-    .replace(/\s*```\s*$/i, '')
-    .trim();
-  const start = s.indexOf('[');
-  const end = s.lastIndexOf(']');
-  if (start !== -1 && end > start) return s.slice(start, end + 1);
-  if (start !== -1 && !s.endsWith(']')) {
-    const lastBrace = s.lastIndexOf('}');
-    if (lastBrace > start) return s.slice(start, lastBrace + 1) + ']';
-  }
-  return s;
-}
+// ── VIEW PROMPTS
+const viewPrompts = {
+  live_kpi: `Create a LIVE KPI dashboard with:
+- Animated counting numbers (count up on load using JS)
+- 6 KPI cards with real-time pulse animations and colored glowing borders
+- An interactive bar/line chart built with pure JS (hover tooltips showing exact values)
+- Animated progress bars that fill on page load
+- A "last updated" timestamp that ticks every second
+- Color-coded status indicators (green=good, amber=warning, red=alert)
+- Sparkline mini-charts inside KPI cards`,
 
-// ── GENERATE ──────────────────────────────────────────────────
+  trend_analysis: `Create a TREND ANALYSIS dashboard with:
+- Multi-line chart showing trends over time (pure JS, interactive hover)
+- Moving average overlay on the chart
+- Week-over-week and month-over-month percentage change indicators with arrows (↑↓)
+- Trend direction badges (GROWING / DECLINING / STABLE) with colored backgrounds
+- A seasonality heatmap table (rows=weeks, cols=days, color intensity=value)
+- Forecast section showing projected next period based on trend`,
+
+  comparison: `Create a COMPARISON dashboard with:
+- Side-by-side metric cards for each time period
+- Grouped bar chart comparing periods (interactive, hover tooltips)
+- Delta column showing absolute and percentage change between periods
+- Winner/loser badges on each metric row
+- A radar/spider chart showing multi-dimensional comparison
+- Summary verdict card: which period performed best and why`,
+
+  funnel: `Create a CONVERSION FUNNEL dashboard with:
+- Visual funnel graphic built with CSS (tapering shapes, not just bars)
+- Each funnel stage shows: count, conversion rate, drop-off rate
+- Color intensity based on performance vs benchmark
+- Drop-off analysis: where are we losing the most people
+- Cost per stage if cost data is available
+- Recommendations for which stage to optimize first`,
+
+  insights_report: `Create an AI INSIGHTS REPORT with:
+- Executive summary paragraph at top (2-3 sentences summarizing the data)
+- 6-8 insight cards each with: icon, title, key metric, explanation (2-3 sentences), and specific actionable recommendation
+- Insight categories: PERFORMANCE, ALERT, OPPORTUNITY, BENCHMARK, TREND, RECOMMENDATION
+- Each insight has a severity level badge (CRITICAL / WARNING / INFO / POSITIVE)
+- "What worked" section and "What needs fixing" section
+- Specific next steps checklist with checkboxes (visual only)
+- All insights written in professional Hebrew`,
+
+  executive: `Create an EXECUTIVE SUMMARY dashboard with:
+- Minimal, ultra-clean design with lots of white space
+- Top 3 most important numbers front and center (very large font)
+- Single-sentence summary of performance vs goal
+- A simple, clean chart (no clutter) - the most important trend only
+- Traffic light status for each main KPI (🔴🟡🟢)
+- 3 strategic recommendations in bold
+- One-line bottom line statement
+- Designed to be read in under 60 seconds`
+};
+
+// ── GENERATE
 async function generate() {
-  const apiKey = localStorage.getItem('dashgen_api_key');
-  
-  if (!workbook || !activeSheet) return;
+  if (!wb || !activeSheet) { showErr('לא נטען קובץ', 'אנא העלה קובץ Excel תחילה', ''); return; }
 
-  const btn = document.getElementById('genBtn');
-  const clientName = document.getElementById('clientName').value || activeSheet;
-  const dashType = document.getElementById('dashType').value;
-  const context = document.getElementById('context').value;
+  const btn = document.getElementById('gbtn');
+  btn.classList.add('loading'); btn.disabled = true;
+  clearErr();
+  document.getElementById('res').style.display = 'none';
+  document.getElementById('empty').style.display = 'none';
+  setP(8, 'מחלץ נתונים...');
 
-  btn.classList.add('loading');
-  btn.disabled = true;
-  showProgress(10, 'מחלץ נתונים...');
-  hideStatus();
-  document.getElementById('resultArea').style.display = 'none';
+  const cname = document.getElementById('cname').value || activeSheet;
+  const period = document.getElementById('period').value;
+  const industry = document.getElementById('industry').value;
+  const ctx = document.getElementById('ctx').value;
+  const data = getData(activeSheet);
+  const viewSpec = viewPrompts[selectedView] || viewPrompts.live_kpi;
+
+  const viewNames = { live_kpi:'Live KPI', trend_analysis:'ניתוח מגמות', comparison:'השוואת תקופות', funnel:'משפך המרות', insights_report:'דוח תובנות', executive:'Executive' };
+
+  const prompt = `You are an expert data analyst and frontend developer. Create a stunning, fully interactive HTML dashboard report.
+
+CLIENT: "${cname}"
+${period ? `PERIOD: ${period}` : ''}
+${industry ? `INDUSTRY: ${industry}` : ''}
+REPORT TYPE: ${viewNames[selectedView]}
+DATA FROM SHEET "${activeSheet}":
+${JSON.stringify(data)}
+${ctx ? `ADDITIONAL CONTEXT: ${ctx}` : ''}
+
+DASHBOARD REQUIREMENTS:
+${viewSpec}
+
+MANDATORY TECHNICAL REQUIREMENTS:
+1. Output ONLY complete HTML starting with <!DOCTYPE html> — no markdown, no explanations
+2. DARK THEME: background #060610, cards #0e0e20, text #e2e2f5
+3. RTL Hebrew layout (dir="rtl" on html tag)
+4. Google Fonts: Heebo for text, JetBrains Mono for numbers
+5. Use ACTUAL DATA VALUES from the sheet — never use placeholder data
+6. All charts must be built with pure vanilla JS (no Chart.js, no D3, no libraries)
+7. All animations must trigger on page load (use setTimeout/requestAnimationFrame)
+8. Hover interactions on all chart elements (tooltips showing exact values)
+9. Fully self-contained — only Google Fonts may be external
+10. Professional Hebrew text throughout — insights, labels, recommendations
+11. Include a header with: client name, period, and a live clock (updated every second with JS)
+12. Footer with: "נוצר על ידי DashGen | ${new Date().toLocaleDateString('he-IL')}"
+
+VISUAL QUALITY REQUIREMENTS:
+- Subtle grid background pattern
+- Glowing colored borders on important cards (box-shadow with color)
+- Smooth CSS transitions on all interactive elements
+- Number animations: count up from 0 to final value on load
+- Color coding: green for positive/good, red for negative/alert, amber for warning
+- Each section must have a clear visual hierarchy
+
+The dashboard must look like a premium, professional live reporting tool that would impress a client.
+Start immediately with <!DOCTYPE html>`;
 
   try {
-    const sheetData = extractSheetData(activeSheet);
-    const dashTypes = {
-      summary: 'סיכום KPI ומדדים מרכזיים עם כרטיסי נתונים',
-      comparison: 'השוואה בין תקופות / קטגוריות עם גרף עמודות',
-      flow: 'תרשים זרימה / תהליך המציג שלבים ומעברים',
-      timeline: 'ציר זמן / רודמאפ המציג אירועים לפי תאריכים',
-      hierarchy: 'היררכיה / עץ המציג יחסי הורה-ילד'
-    };
-
-    showProgress(25, 'שולח ל-Claude AI...');
-
-    const prompt = `You are a data visualization expert. Create a complete, beautiful, self-contained HTML dashboard page.
-
-Client: "${clientName}"
-Sheet: "${activeSheet}"
-Dashboard type: ${dashTypes[dashType]}
-Data:
-${JSON.stringify(sheetData)}
-${context ? `Extra context: ${context}` : ''}
-
-REQUIREMENTS:
-1. Output ONLY a complete HTML document (<!DOCTYPE html> ... </html>). Nothing else.
-2. Dark theme: background #07070e, cards #111120, text #e2e2f2
-3. RTL Hebrew layout (dir="rtl"), font: Heebo from Google Fonts
-4. Include real data from the spreadsheet - use actual column names and values
-5. KPI cards at top with colored borders (indigo, green, red, amber, cyan)
-6. A bar chart using pure CSS/JS (no external chart libraries) showing key metric over time/categories
-7. A comparison table if multiple time periods exist
-8. 2-4 insight cards at the bottom with recommendations
-9. Animated progress bars and fade-in effects
-10. Responsive (works on mobile)
-11. Professional executive style - no emojis in data, clean typography
-12. The dashboard must be FULLY self-contained - no external dependencies except Google Fonts
-13. Title should include "${clientName}"
-14. Use JetBrains Mono for numbers, Heebo for text
-
-Return ONLY the complete HTML. Start with <!DOCTYPE html>.`;
+    setP(20, 'שולח ל-Claude AI...');
 
     const resp = await fetch('/api/generate', {
       method: 'POST',
@@ -577,137 +598,112 @@ Return ONLY the complete HTML. Start with <!DOCTYPE html>.`;
       body: JSON.stringify({ prompt })
     });
 
-    showProgress(75, 'מעבד תגובה...');
+    setP(65, 'מקבל תגובה...');
 
     if (!resp.ok) {
       const err = await resp.json().catch(() => ({}));
-      throw new Error(err?.error || `HTTP ${resp.status}`);
+      const msg = err?.error || `HTTP ${resp.status}`;
+      let hint = '';
+      if (resp.status === 500 && msg.includes('ANTHROPIC_API_KEY'))
+        hint = 'הגדר את ANTHROPIC_API_KEY ב-Vercel → Settings → Environment Variables ואז Redeploy';
+      throw { t: `שגיאת שרת (${resp.status})`, d: msg, h: hint };
     }
 
-    const data = await resp.json();
-    let html = data.html || '';
-    html = html.trim();
+    const json = await resp.json();
+    setP(85, 'מעבד HTML...');
+
+    let html = (json.html || '').trim();
+    if (html.startsWith('```')) html = html.replace(/^```[\w]*\n?/, '').replace(/\n?```\s*$/, '').trim();
     if (!html.startsWith('<!DOCTYPE') && !html.startsWith('<html')) {
-      const start = html.indexOf('<!DOCTYPE');
-      if (start !== -1) html = html.slice(start);
-      else throw new Error('התגובה לא כוללת HTML תקין. נסה שוב.');
+      const idx = html.indexOf('<!DOCTYPE');
+      if (idx > -1) html = html.slice(idx);
+      else throw { t: 'תגובה לא תקינה', d: 'Claude לא החזיר HTML תקין: ' + html.slice(0, 150), h: 'נסה שוב' };
     }
 
-    showProgress(95, 'מציג תצוגה מקדימה...');
-    generatedHTML = html;
-    showResult(clientName, activeSheet);
-    addToHistory(clientName, activeSheet, dashType, html);
-    showProgress(100, 'הושלם!');
-    setTimeout(() => hideProgress(), 800);
+    currentHTML = html;
+    setP(100, 'הושלם!');
+    setTimeout(() => document.getElementById('prog').classList.remove('on'), 800);
 
-  } catch(err) {
-    showStatus('error', '⚠ שגיאה: ' + err.message);
-    hideProgress();
-  } finally {
-    btn.classList.remove('loading');
-    btn.disabled = false;
+    showResult(cname, viewNames[selectedView]);
+    addHist(cname, viewNames[selectedView]);
+
+  } catch(e) {
+    if (e?.t) showErr(e.t, e.d, e.h || '');
+    else showErr('שגיאה', e?.message || String(e), '');
+    document.getElementById('prog').classList.remove('on');
   }
+
+  btn.classList.remove('loading'); btn.disabled = false;
 }
 
-// ── RESULT ────────────────────────────────────────────────────
-function showResult(clientName, sheetName) {
-  document.getElementById('emptyState').style.display = 'none';
-  document.getElementById('resultTitle').textContent = `דשבורד — ${clientName}`;
-  document.getElementById('resultArea').style.display = 'block';
-  document.getElementById('resultArea').classList.add('fade-in');
-
-  // Preview in iframe
-  const frame = document.getElementById('previewFrame');
-  const blob = new Blob([generatedHTML], { type: 'text/html;charset=utf-8' });
-  generatedBlob = blob;
+// ── RESULT
+function showResult(name, type) {
+  const blob = new Blob([currentHTML], { type: 'text/html;charset=utf-8' });
   const url = URL.createObjectURL(blob);
-  frame.src = url;
+  document.getElementById('pframe').src = url;
   document.getElementById('openBtn').href = url;
-  document.getElementById('previewUrl').textContent = `${clientName} — ${sheetName}`;
+  document.getElementById('rtitle').textContent = name + ' — ' + type;
+  document.getElementById('plbl').textContent = name;
+  document.getElementById('res').style.display = 'block';
+  document.getElementById('res').scrollIntoView({ behavior: 'smooth' });
 }
 
-function downloadHTML() {
-  if (!generatedHTML) return;
-  const clientName = document.getElementById('clientName').value || 'dashboard';
-  const safe = clientName.replace(/[^a-zA-Z0-9\u0590-\u05FF]/g, '_');
+function dl() {
+  if (!currentHTML) return;
+  const n = (document.getElementById('cname').value || 'report').replace(/[^a-zA-Z0-9\u0590-\u05FF]/g, '_');
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([generatedHTML], { type: 'text/html' }));
-  a.download = `${safe}.html`;
-  a.click();
+  a.href = URL.createObjectURL(new Blob([currentHTML], { type: 'text/html' }));
+  a.download = n + '_live_report.html'; a.click();
 }
 
-function copyLink() {
-  if (!generatedBlob) return;
-  const url = URL.createObjectURL(generatedBlob);
+function copyShareLink() {
+  if (!currentHTML) return;
+  const url = URL.createObjectURL(new Blob([currentHTML], { type: 'text/html' }));
   navigator.clipboard.writeText(url).then(() => {
-    const btn = document.getElementById('copyLinkBtn');
+    const btn = event.target;
     btn.textContent = '✓ הועתק!';
     setTimeout(() => btn.textContent = '🔗 העתק קישור', 2000);
   });
 }
 
-// ── HISTORY ───────────────────────────────────────────────────
-function addToHistory(clientName, sheetName, dashType, html) {
-  const item = {
-    id: Date.now(),
-    clientName, sheetName, dashType, html,
-    time: new Date().toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })
-  };
-  history.unshift(item);
-  renderHistory();
+// ── HISTORY
+function addHist(name, type) {
+  history.unshift({ id: Date.now(), name, type, html: currentHTML, t: new Date().toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' }) });
+  if (history.length > 8) history.pop();
+  renderHist();
 }
 
-function renderHistory() {
-  if (history.length === 0) return;
-  document.getElementById('historyArea').style.display = 'block';
-  const list = document.getElementById('historyList');
-  list.innerHTML = history.map(item => `
-    <div class="history-item" onclick="loadFromHistory(${item.id})">
-      <div>
-        <div class="history-name">${item.clientName}</div>
-        <div class="history-meta">${item.sheetName}  |  ${item.time}</div>
-      </div>
-      <button class="history-btn" onclick="event.stopPropagation();downloadFromHistory(${item.id})">⬇ הורד</button>
-    </div>
-  `).join('');
+function renderHist() {
+  document.getElementById('hist').classList.add('on');
+  document.getElementById('hlist').innerHTML = history.map(h => `
+    <div class="hitem" onclick="loadH(${h.id})">
+      <div><div class="hn">${h.name}</div><div class="hm">${h.type} | ${h.t}</div></div>
+      <button class="hdl" onclick="event.stopPropagation();dlH(${h.id})">⬇</button>
+    </div>`).join('');
 }
 
-function loadFromHistory(id) {
-  const item = history.find(h => h.id === id);
-  if (!item) return;
-  generatedHTML = item.html;
-  showResult(item.clientName, item.sheetName);
-}
-
-function downloadFromHistory(id) {
-  const item = history.find(h => h.id === id);
-  if (!item) return;
-  const safe = item.clientName.replace(/[^a-zA-Z0-9\u0590-\u05FF]/g, '_');
+function loadH(id) { const h = history.find(x => x.id === id); if (h) { currentHTML = h.html; showResult(h.name, h.type); } }
+function dlH(id) {
+  const h = history.find(x => x.id === id); if (!h) return;
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([item.html], { type: 'text/html' }));
-  a.download = `${safe}.html`;
-  a.click();
+  a.href = URL.createObjectURL(new Blob([h.html], { type: 'text/html' }));
+  a.download = h.name.replace(/[^a-zA-Z0-9\u0590-\u05FF]/g, '_') + '.html'; a.click();
 }
 
-// ── UI HELPERS ────────────────────────────────────────────────
-function showProgress(pct, msg) {
-  document.getElementById('progressWrap').classList.add('show');
-  document.getElementById('progressFill').style.width = pct + '%';
-  document.getElementById('progressMsg').textContent = msg;
+// ── HELPERS
+function setP(pct, msg) {
+  document.getElementById('prog').classList.add('on');
+  document.getElementById('pfill').style.width = pct + '%';
+  document.getElementById('pmsg').textContent = msg;
 }
-function hideProgress() {
-  document.getElementById('progressWrap').classList.remove('show');
+function showErr(t, d, h) {
+  const b = document.getElementById('errbox');
+  document.getElementById('errt').textContent = '⚠ ' + t;
+  document.getElementById('errd').textContent = d;
+  const hel = document.getElementById('errh'); hel.textContent = h; hel.style.display = h ? 'block' : 'none';
+  b.classList.add('on'); b.scrollIntoView({ behavior: 'smooth' });
 }
-function showStatus(type, msg) {
-  const box = document.getElementById('statusBox');
-  box.className = 'status-box show ' + type;
-  box.textContent = msg;
-}
-function hideStatus() {
-  document.getElementById('statusBox').classList.remove('show');
-}
-
-
+function clearErr() { document.getElementById('errbox').classList.remove('on'); }
 </script>
 </body>
 </html>
