@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DashGen — Live Reports</title>
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+/* ── APP SHELL ── */
+:root{--bg:#060610;--panel:#0a0a18;--card:#0e0e20;--border:#1c1c38;--border2:#252545;--accent:#6366f1;--accent2:#818cf8;--glow:rgba(99,102,241,.18);--green:#22c55e;--green2:#4ade80;--red:#ef4444;--amber:#f59e0b;--cyan:#06b6d4;--text:#e2e2f5;--muted:#6b6b99;--dim:#3a3a5c}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Heebo',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(99,102,241,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(99,102,241,.04) 1px,transparent 1px);background-size:48px 48px;pointer-events:none;z-index:0}
+
+.topbar{position:relative;z-index:10;display:flex;align-items:center;justify-content:space-between;padding:0 26px;height:54px;background:rgba(10,10,24,.95);border-bottom:1px solid var(--border2);backdrop-filter:blur(12px)}
+.topbar::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--accent),var(--cyan),transparent)}
+.logo{font-size:17px;font-weight:900;color:#fff;letter-spacing:-.02em}.logo span{color:#818cf8}
+.logo-sub{font-size:9px;color:var(--muted);font-family:'JetBrains Mono',monospace;letter-spacing:.1em;margin-top:1px}
+.live-badge{display:flex;align-items:center;gap:5px;padding:4px 11px;border-radius:99px;background:rgba(34,197,94,.07);border:1px solid rgba(34,197,94,.22);font-size:10px;font-weight:700;color:#4ade80;font-family:'JetBrains Mono',monospace;letter-spacing:.08em}
+.live-dot{width:6px;height:6px;border-radius:50%;background:#4ade80;box-shadow:0 0 6px #4ade80;animation:blink 2s ease-in-out infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+
+.layout{position:relative;z-index:1;display:grid;grid-template-columns:285px 1fr;min-height:calc(100vh - 54px)}
+@media(max-width:700px){.layout{grid-template-columns:1fr}}
+
+.sidebar{background:var(--panel);border-left:1px solid var(--border2);padding:20px 15px;display:flex;flex-direction:column;gap:18px;overflow-y:auto;max-height:calc(100vh - 54px)}
+.sec-lbl{font-size:9px;font-weight:700;letter-spacing:.13em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+
+.drop{border:2px dashed var(--border2);border-radius:11px;padding:20px 13px;text-align:center;cursor:pointer;position:relative;transition:.2s;background:var(--card)}
+.drop:hover,.drop.over{border-color:var(--accent);background:rgba(99,102,241,.05);box-shadow:0 0 18px var(--glow)}
+.drop input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.drop-icon{font-size:24px;margin-bottom:6px}.drop-t{font-size:12px;font-weight:700;color:#fff;margin-bottom:2px}.drop-s{font-size:11px;color:var(--muted)}
+
+.finfo{background:var(--card);border:1px solid var(--border2);border-radius:8px;padding:9px 11px;display:none}
+.finfo.show{display:block}
+.finfo-name{font-size:12px;font-weight:700;color:#fff;word-break:break-all}.finfo-meta{font-size:10px;color:var(--muted);font-family:'JetBrains Mono',monospace;margin-top:2px}
+
+.stabs{display:flex;flex-wrap:wrap;gap:5px}
+.stab{padding:4px 10px;border-radius:5px;border:1px solid var(--border2);background:var(--card);color:var(--muted);font-size:11px;cursor:pointer;font-family:'Heebo',sans-serif;transition:.15s}
+.stab:hover{border-color:var(--accent);color:var(--text)}.stab.on{border-color:var(--accent);background:rgba(99,102,241,.12);color:#818cf8;font-weight:700}
+
+.field{display:flex;flex-direction:column;gap:5px}
+.field label{font-size:11px;color:var(--muted)}
+.field input,.field textarea{width:100%;background:var(--card);border:1px solid var(--border2);color:var(--text);border-radius:7px;font-family:'Heebo',sans-serif;font-size:13px;padding:8px 10px;outline:none;transition:.15s}
+.field input:focus,.field textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--glow)}
+.field textarea{min-height:55px;resize:vertical}
+
+.genbtn{width:100%;padding:12px;border-radius:9px;border:none;background:linear-gradient(135deg,#6366f1,#a855f7);color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:'Heebo',sans-serif;transition:.2s;box-shadow:0 4px 18px var(--glow)}
+.genbtn:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 7px 24px var(--glow)}
+.genbtn:disabled{background:#1a1a2e;color:var(--muted);cursor:not-allowed;transform:none;box-shadow:none}
+.spin{display:none;width:14px;height:14px;border:2px solid rgba(255,255,255,.25);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;margin:0 auto}
+.genbtn.loading .btxt{display:none}.genbtn.loading .spin{display:block}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.prog{display:none;margin-top:7px}.prog.on{display:block}
+.pbar{height:2px;background:var(--border2);border-radius:2px;overflow:hidden;margin-bottom:5px}
+.pfill{height:100%;background:linear-gradient(90deg,#6366f1,#a855f7,#06b6d4);background-size:200% 100%;animation:sh 1.5s linear infinite;transition:width .4s ease;width:0}
+@keyframes sh{0%{background-position:100% 0}100%{background-position:-100% 0}}
+.pmsg{font-size:10px;color:var(--muted);font-family:'JetBrains Mono',monospace}
+
+.main{padding:24px;overflow-y:auto}
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:58vh;text-align:center;gap:10px;opacity:.38}
+.empty .ei{font-size:44px}.empty .et{font-size:19px;font-weight:700;color:var(--muted)}.empty .es{font-size:13px;color:var(--dim);max-width:280px;line-height:1.6}
+
+.errbox{background:rgba(239,68,68,.07);border:1px solid rgba(239,68,68,.25);border-radius:9px;padding:13px 15px;margin-bottom:15px;display:none}
+.errbox.on{display:block}
+.err-t{font-size:13px;font-weight:700;color:#f87171;margin-bottom:4px}
+.err-d{font-size:12px;color:#f87171;font-family:'JetBrains Mono',monospace;line-height:1.6;word-break:break-all}
+.err-h{font-size:11px;color:var(--muted);margin-top:7px;padding-top:7px;border-top:1px solid rgba(239,68,68,.15);line-height:1.5}
+
+.rhdr{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:15px}
+.rtitle{font-size:16px;font-weight:900;color:#fff}
+.rbtns{display:flex;gap:7px;flex-wrap:wrap}
+.btn{padding:7px 14px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Heebo',sans-serif;transition:.15s;text-decoration:none;display:inline-flex;align-items:center;gap:5px;border:none}
+.btn-green{background:var(--green);color:#000}.btn-green:hover{background:#4ade80}
+.btn-ghost{background:transparent;border:1px solid var(--border2);color:var(--muted)}.btn-ghost:hover{border-color:var(--accent2);color:var(--accent2)}
+
+.pwrap{background:var(--card);border:1px solid var(--border2);border-radius:12px;overflow:hidden;box-shadow:0 16px 50px rgba(0,0,0,.4)}
+.ptbar{padding:9px 13px;background:var(--panel);border-bottom:1px solid var(--border2);display:flex;align-items:center;gap:6px}
+.pdot{width:9px;height:9px;border-radius:50%}
+.plbl{font-size:11px;color:var(--muted);font-family:'JetBrains Mono',monospace;margin-right:8px}
+.pframe{width:100%;height:70vh;border:none;background:#07070e}
+
+.hist{margin-top:22px;padding-top:16px;border-top:1px solid var(--border);display:none}.hist.on{display:block}
+.hlbl{font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:9px}
+.hlist{display:flex;flex-direction:column;gap:6px}
+.hitem{background:var(--card);border:1px solid var(--border2);border-radius:7px;padding:9px 11px;display:flex;align-items:center;justify-content:space-between;gap:9px;cursor:pointer;transition:.15s}
+.hitem:hover{border-color:var(--accent)}
+.hn{font-size:12px;font-weight:700;color:#fff}.hm{font-size:10px;color:var(--muted);font-family:'JetBrains Mono',monospace;margin-top:1px}
+.hdl{font-size:11px;padding:3px 8px;border-radius:5px;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer;font-family:'Heebo',sans-serif;transition:.15s;flex-shrink:0}
+.hdl:hover{border-color:var(--green);color:var(--green)}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div>
+    <div class="logo">Dash<span>Gen</span></div>
+    <div class="logo-sub">AI-POWERED LIVE REPORTS</div>
+  </div>
+  <div class="live-badge"><div class="live-dot"></div>LIVE</div>
+</div>
+
+<div class="layout">
+<aside class="sidebar">
+
+  <div>
+    <div class="sec-lbl">1. העלאת קובץ</div>
+    <div class="drop" id="drop">
+      <input type="file" id="fin" accept=".xlsx,.xls,.csv">
+      <div class="drop-icon">📁</div>
+      <div class="drop-t">גרור קובץ Excel</div>
+      <div class="drop-s">.xlsx  .xls  .csv</div>
+    </div>
+    <div class="finfo" id="finfo">
+      <div class="finfo-name" id="fname"></div>
+      <div class="finfo-meta" id="fmeta"></div>
+    </div>
+  </div>
+
+  <div id="ssec" style="display:none">
+    <div class="sec-lbl">2. בחירת גיליון</div>
+    <div class="stabs" id="stabs"></div>
+  </div>
+
+  <div id="csec" style="display:none">
+    <div class="sec-lbl">3. פרטי הדוח</div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div class="field"><label>שם לקוח / קמפיין</label><input type="text" id="cname" placeholder="לדוגמה: ENAV..."></div>
+      <div class="field"><label>תקופת הדוח</label><input type="text" id="period" placeholder="פברואר 2026, Q1..."></div>
+      <div class="field"><label>הקשר נוסף (אופציונלי)</label><textarea id="ctx" placeholder="יעדים, נקודות דגש, מה חשוב להציג..."></textarea></div>
+    </div>
+  </div>
+
+  <div id="gsec" style="display:none">
+    <button class="genbtn" id="gbtn" onclick="generate()">
+      <span class="btxt">✨ צור דוח Live</span>
+      <div class="spin"></div>
+    </button>
+    <div class="prog" id="prog">
+      <div class="pbar"><div class="pfill" id="pfill"></div></div>
+      <div class="pmsg" id="pmsg"></div>
+    </div>
+  </div>
+
+</aside>
+
+<main class="main">
+  <div class="empty" id="empty">
+    <div class="ei">📊</div>
+    <div class="et">מוכן ליצור דוח Live</div>
+    <div class="es">העלה קובץ Excel ולחץ "צור דוח Live"</div>
+  </div>
+
+  <div class="errbox" id="errbox">
+    <div class="err-t" id="errt"></div>
+    <div class="err-d" id="errd"></div>
+    <div class="err-h" id="errh"></div>
+  </div>
+
+  <div id="res" style="display:none">
+    <div class="rhdr">
+      <div class="rtitle" id="rtitle">דוח מוכן ✓</div>
+      <div class="rbtns">
+        <button class="btn btn-ghost" onclick="dl()">⬇ הורד HTML</button>
+        <a class="btn btn-green" id="openBtn" target="_blank">↗ פתח בטאב חדש</a>
+      </div>
+    </div>
+    <div class="pwrap">
+      <div class="ptbar">
+        <div class="pdot" style="background:#ef4444"></div>
+        <div class="pdot" style="background:#f59e0b"></div>
+        <div class="pdot" style="background:#22c55e"></div>
+        <span class="plbl" id="plbl">תצוגה מקדימה</span>
+        <div class="live-badge" style="margin-right:auto"><div class="live-dot"></div>LIVE</div>
+      </div>
+      <iframe class="pframe" id="pframe"></iframe>
+    </div>
+  </div>
+
+  <div class="hist" id="hist">
+    <div class="hlbl">דוחות קודמים בסשן זה</div>
+    <div class="hlist" id="hlist"></div>
+  </div>
+</main>
+</div>
+
+<script>
+// ── STATE
+let wb = null, activeSheet = null, currentHTML = '', history = [];
+
+// ── FILE
+const drop = document.getElementById('drop');
+drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('over'); });
+drop.addEventListener('dragleave', () => drop.classList.remove('over'));
+drop.addEventListener('drop', e => { e.preventDefault(); drop.classList.remove('over'); loadFile(e.dataTransfer.files[0]); });
+document.getElementById('fin').addEventListener('change', e => loadFile(e.target.files[0]));
+
+function loadFile(f) {
+  if (!f) return;
+  const r = new FileReader();
+  r.onload = e => {
+    try {
+      wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+      document.getElementById('fname').textContent = f.name;
+      document.getElementById('fmeta').textContent = wb.SheetNames.length + ' גיליונות | ' + (f.size/1024).toFixed(1) + ' KB';
+      document.getElementById('finfo').classList.add('show');
+      buildTabs();
+      ['ssec','csec','gsec'].forEach(id => document.getElementById(id).style.display = 'block');
+      const cn = document.getElementById('cname');
+      if (!cn.value) cn.value = f.name.replace(/\.[^.]+$/, '').replace(/[_-]/g, ' ');
+    } catch(err) { showErr('שגיאה בקריאת הקובץ', err.message, ''); }
+  };
+  r.readAsArrayBuffer(f);
+}
+
+function buildTabs() {
+  const c = document.getElementById('stabs'); c.innerHTML = '';
+  wb.SheetNames.forEach((n, i) => {
+    const b = document.createElement('button');
+    b.className = 'stab' + (i===0?' on':''); b.textContent = n;
+    b.onclick = () => { document.querySelectorAll('.stab').forEach(t=>t.classList.remove('on')); b.classList.add('on'); activeSheet = n; };
+    c.appendChild(b); if(i===0) activeSheet = n;
+  });
+}
+
+function getData(s) {
+  const ws = wb.Sheets[s];
+  const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+  return {
+    headers: (rows[0]||[]).slice(0,12),
+    rows: rows.slice(1,20).map(r => r.slice(0,12).map(v => String(v??'').slice(0,40))),
+    totalRows: rows.length - 1
+  };
+}
+
+// ── TEMPLATE BUILDER ── (builds ENAV-style HTML from JSON data)
+function buildDashboard(report) {
+  const d = report;
+  const today = new Date().toLocaleDateString('he-IL');
+
+  // build KPI cards HTML
+  const kpiColors = ['','g','r','a','c','p','g','a'];
+  const kpiHTML = (d.kpis||[]).map((k,i) => `
+    <div class="kpi ${kpiColors[i]||''} fi">
+      <div class="kpi-lbl">${k.label}</div>
+      <div class="kpi-val">${k.value}</div>
+      <div class="kpi-sub ${k.status||''}">${k.sub||''}</div>
+    </div>`).join('');
+
+  // build bar chart data
+  const barsJS = d.chart && d.chart.bars ? `
+    const chartData=${JSON.stringify(d.chart.bars)};
+    const mx=Math.max(...chartData.map(b=>b.v));
+    const bc=document.getElementById('chartBars');
+    chartData.forEach(item=>{
+      const h=Math.max(3,Math.round((item.v/mx)*148));
+      const el=document.createElement('div'); el.className='bc';
+      el.innerHTML='<div class="btt">'+item.tooltip+'</div><div class="bar '+(item.t||'n')+'" style="height:'+h+'px"></div><span class="blbl">'+item.d+'</span>';
+      bc.appendChild(el);
+    });` : '';
+
+  // build progress bars
+  const progressHTML = (d.progress||[]).map(p => `
+    <div class="pi">
+      <div class="pr"><span class="pn">${p.label}</span><span class="pv">${p.text}</span></div>
+      <div class="pt2"><div class="pf" data-w="${p.pct}" style="background:var(--${p.color||'accent'})"></div></div>
+    </div>`).join('');
+
+  // build comparison table
+  const tableHTML = d.table ? `
+    <div class="panel fi s2">
+      <div class="ph"><div class="pt">${d.table.title||'השוואה'}</div><span class="ptag">${d.table.tag||'COMPARE'}</span></div>
+      <div class="pb" style="padding:16px 12px">
+        <table class="ctbl">
+          <thead><tr><th>מדד</th>${(d.table.cols||[]).map((c,i)=>`<th class="${['cj','cf','cd'][i]||'cj'}">${c}</th>`).join('')}</tr></thead>
+          <tbody>${(d.table.rows||[]).map(row=>`<tr><td>${row[0]}</td>${row.slice(1).map((v,i)=>`<td class="${['vj','vfo','vd'][i]||'vj'}">${v}</td>`).join('')}</tr>`).join('')}</tbody>
+        </table>
+      </div>
+    </div>` : '';
+
+  // build insight cards
+  const insightTypes = ['al','pk','cs','tr'];
+  const insightHTML = (d.insights||[]).map((ins,i) => `
+    <div class="ic ${insightTypes[i%4]} fi s${i+1}">
+      <div class="itag">${ins.tag}</div>
+      <div class="itti">${ins.title}</div>
+      <div class="ival">${ins.value}</div>
+      <div class="idsc">${ins.desc}</div>
+      <div class="irec"><strong>המלצה:</strong> ${ins.rec}</div>
+    </div>`).join('');
+
+  return `<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>${d.clientName} — דשבורד ביצועים | ${d.period||''}</title>
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#07070e;--surface:#0d0d18;--card:#111120;--border:#1e1e35;--border2:#2a2a45;--accent:#6366f1;--accent2:#818cf8;--green:#22c55e;--green2:#4ade80;--red:#ef4444;--red2:#f87171;--amber:#f59e0b;--amber2:#fbbf24;--cyan:#06b6d4;--cyan2:#67e8f9;--purple:#8b5cf6;--purple2:#c4b5fd;--text:#e8e8f8;--muted:#9090bb;--dim:#55557a}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Heebo',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(var(--border) 1px,transparent 1px),linear-gradient(90deg,var(--border) 1px,transparent 1px);background-size:40px 40px;opacity:.25;pointer-events:none;z-index:0}
+.wrap{position:relative;z-index:1;max-width:1280px;margin:0 auto;padding:0 24px 60px}
+header{border-bottom:1px solid var(--border2);padding:26px 0 22px;margin-bottom:32px;position:relative}
+header::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--accent),var(--cyan),transparent)}
+.hdr{max-width:1280px;margin:0 auto;padding:0 24px;display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:14px}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--green);box-shadow:0 0 10px var(--green);animation:pulse 2s ease-in-out infinite;flex-shrink:0}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.8)}}
+.brand-name{font-size:22px;font-weight:900;letter-spacing:-.03em;color:#fff}
+.brand-name span{color:var(--accent2)}
+.hdr-meta p{font-size:13px;color:var(--muted);font-family:'JetBrains Mono',monospace}
+.hdr-meta strong{color:var(--amber2)}
+.badge{display:inline-flex;align-items:center;gap:6px;padding:4px 14px;border-radius:99px;border:1px solid var(--green);background:rgba(34,197,94,.08);font-size:11px;font-weight:700;color:var(--green);font-family:'JetBrains Mono',monospace;letter-spacing:.08em}
+.kpi-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:14px;margin-bottom:26px}
+@media(max-width:1100px){.kpi-grid{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:600px){.kpi-grid{grid-template-columns:repeat(2,1fr)}}
+.kpi{background:var(--card);border:1px solid var(--border2);border-top:2px solid var(--accent);border-radius:10px;padding:18px 16px 14px;position:relative;overflow:hidden;transition:transform .2s,box-shadow .2s}
+.kpi:hover{transform:translateY(-2px);box-shadow:0 8px 32px rgba(0,0,0,.5)}
+.kpi::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at top right,rgba(255,255,255,.03),transparent 60%)}
+.kpi.g{border-top-color:var(--green)}.kpi.r{border-top-color:var(--red)}.kpi.a{border-top-color:var(--amber)}.kpi.c{border-top-color:var(--cyan)}.kpi.p{border-top-color:var(--purple)}
+.kpi-lbl{font-size:11px;color:var(--muted);font-weight:500;letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px}
+.kpi-val{font-size:26px;font-weight:900;color:#fff;line-height:1;margin-bottom:5px;font-family:'JetBrains Mono',monospace}
+.kpi.g .kpi-val{color:var(--green2)}.kpi.r .kpi-val{color:var(--red2)}.kpi.a .kpi-val{color:var(--amber2)}.kpi.c .kpi-val{color:var(--cyan2)}.kpi.p .kpi-val{color:var(--purple2)}
+.kpi-sub{font-size:11px;color:var(--dim)}.kpi-sub.warn{color:var(--red)}.kpi-sub.ok{color:var(--green)}.kpi-sub.mild{color:var(--amber)}
+.main-grid{display:grid;grid-template-columns:1fr 400px;gap:20px;margin-bottom:20px}
+@media(max-width:1000px){.main-grid{grid-template-columns:1fr}}
+.panel{background:var(--card);border:1px solid var(--border2);border-radius:12px;overflow:hidden}
+.ph{padding:15px 20px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px}
+.pt{font-size:14px;font-weight:700;color:var(--text)}
+.ptag{font-size:10px;font-family:'JetBrains Mono',monospace;padding:3px 8px;border-radius:4px;background:rgba(99,102,241,.15);color:var(--accent2);border:1px solid rgba(99,102,241,.25);letter-spacing:.06em}
+.pb{padding:20px}
+.chart-wrap{position:relative}
+.chart-bars{display:flex;align-items:flex-end;gap:4px;height:175px;padding-bottom:26px;border-bottom:1px solid var(--border2);position:relative}
+.chart-bars::before,.chart-bars::after{content:'';position:absolute;left:0;right:0;height:1px;background:var(--border)}
+.chart-bars::before{bottom:66px}.chart-bars::after{bottom:106px}
+.bc{flex:1;display:flex;flex-direction:column;align-items:center;position:relative}
+.bar{width:100%;border-radius:3px 3px 0 0;transition:opacity .2s;cursor:pointer}
+.bar:hover{opacity:.75}
+.bar.n{background:linear-gradient(180deg,#5a6bf5,#3b4abf)}
+.bar.s{background:linear-gradient(180deg,#fbbf24,#d97706)}
+.bar.pk{background:linear-gradient(180deg,#f87171,#dc2626)}
+.blbl{font-size:9px;color:var(--dim);position:absolute;bottom:-18px;white-space:nowrap;font-family:'JetBrains Mono',monospace}
+.btt{position:absolute;bottom:calc(100% + 5px);left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid var(--border2);border-radius:6px;padding:4px 8px;font-size:11px;color:var(--text);white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .15s;z-index:10;font-family:'JetBrains Mono',monospace}
+.bc:hover .btt{opacity:1}
+.chart-legend{display:flex;gap:20px;margin-top:14px;font-size:11px;color:var(--muted)}
+.ldot{display:inline-block;width:10px;height:10px;border-radius:2px;margin-left:5px}
+.pi{margin-bottom:12px}.pr{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px}
+.pn{font-size:12px;color:var(--muted)}.pv{font-size:12px;font-family:'JetBrains Mono',monospace;color:var(--text)}
+.pt2{height:5px;background:var(--border2);border-radius:3px;overflow:hidden}
+.pf{height:100%;border-radius:3px;transition:width 1.1s cubic-bezier(.4,0,.2,1)}
+.ctbl{width:100%;border-collapse:collapse}
+.ctbl th{padding:8px 10px;font-size:11px;font-weight:700;text-align:center;border-bottom:1px solid var(--border2);letter-spacing:.04em}
+.ctbl th:first-child{text-align:right;color:var(--muted)}
+.ctbl th.cj{color:var(--accent2)}.ctbl th.cf{color:var(--amber2)}.ctbl th.cd{color:var(--green2)}
+.ctbl td{padding:9px 10px;font-size:12px;text-align:center;border-bottom:1px solid rgba(30,30,53,.8);font-family:'JetBrains Mono',monospace}
+.ctbl td:first-child{text-align:right;font-family:'Heebo',sans-serif;color:var(--muted);font-size:12px}
+.ctbl tr:last-child td{border-bottom:none}.ctbl tr:hover td{background:rgba(255,255,255,.02)}
+.vj{color:var(--accent2)}.vfo{color:var(--amber2)}.vfw{color:var(--red2)}.vd{color:var(--green2)}.vna{color:var(--dim)}
+.ins-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:20px}
+@media(max-width:900px){.ins-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:500px){.ins-grid{grid-template-columns:1fr}}
+.ic{background:var(--card);border:1px solid var(--border2);border-radius:12px;padding:20px;position:relative;overflow:hidden;transition:transform .2s,box-shadow .2s}
+.ic:hover{transform:translateY(-3px);box-shadow:0 12px 40px rgba(0,0,0,.5)}
+.ic::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+.ic.al::before{background:var(--red)}.ic.pk::before{background:var(--amber)}.ic.cs::before{background:var(--purple)}.ic.tr::before{background:var(--green)}
+.itag{font-size:10px;font-family:'JetBrains Mono',monospace;font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px}
+.ic.al .itag{color:var(--red)}.ic.pk .itag{color:var(--amber)}.ic.cs .itag{color:var(--purple2)}.ic.tr .itag{color:var(--green)}
+.itti{font-size:16px;font-weight:700;color:#fff;margin-bottom:6px;line-height:1.3}
+.ival{font-size:24px;font-weight:900;margin:8px 0;font-family:'JetBrains Mono',monospace;line-height:1}
+.ic.al .ival{color:var(--red2)}.ic.pk .ival{color:var(--amber2)}.ic.cs .ival{color:var(--purple2)}.ic.tr .ival{color:var(--green2)}
+.idsc{font-size:12px;color:var(--muted);line-height:1.6;margin-top:8px}
+.irec{font-size:11px;color:var(--dim);margin-top:10px;padding-top:10px;border-top:1px solid var(--border);line-height:1.5}
+.irec strong{color:var(--text)}
+footer{margin-top:40px;padding-top:20px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px}
+footer p{font-size:11px;color:var(--dim);font-family:'JetBrains Mono',monospace}
+.fi{opacity:0;transform:translateY(14px);animation:fu .5s ease forwards}
+@keyframes fu{to{opacity:1;transform:translateY(0)}}
+.fi:nth-child(1){animation-delay:.05s}.fi:nth-child(2){animation-delay:.1s}.fi:nth-child(3){animation-delay:.15s}.fi:nth-child(4){animation-delay:.2s}.fi:nth-child(5){animation-delay:.25s}.fi:nth-child(6){animation-delay:.3s}
+.s1{animation-delay:.1s}.s2{animation-delay:.2s}.s3{animation-delay:.3s}.s4{animation-delay:.4s}
+</style>
+</head>
+<body>
+<header>
+  <div class="hdr">
+    <div class="brand">
+      <div class="dot"></div>
+      <div>
+        <div class="brand-name">${d.clientName.split(' ').slice(0,2).join(' ')} <span>${d.clientName.split(' ').slice(2).join(' ')||''}</span></div>
+        <div style="font-size:12px;color:var(--muted);margin-top:2px">${d.subtitle||'דשבורד ביצועי קמפיין'}</div>
+      </div>
+    </div>
+    <div class="hdr-meta">
+      <p>${d.period||''}</p>
+      <p style="margin-top:4px">תאריך דוח: <strong>${today}</strong></p>
+    </div>
+    <div class="badge"><span class="dot" style="width:6px;height:6px;margin:0"></span>LIVE REPORT</div>
+  </div>
+</header>
+<div class="wrap">
+  <div class="kpi-grid">${kpiHTML}</div>
+  <div class="main-grid">
+    <div class="panel fi s1">
+      <div class="ph"><div class="pt">${d.chart&&d.chart.title||'גרף'}</div><span class="ptag">${d.chart&&d.chart.tag||'CHART'}</span></div>
+      <div class="pb">
+        <div class="chart-wrap">
+          <div class="chart-bars" id="chartBars"></div>
+          ${d.chart&&d.chart.annotation?`<div style="position:absolute;bottom:28px;right:0;background:rgba(245,158,11,.1);border:1px dashed rgba(245,158,11,.4);border-radius:6px;padding:3px 8px;font-size:10px;color:var(--amber2);font-family:'JetBrains Mono',monospace">${d.chart.annotation}</div>`:''}
+          <div class="chart-legend">${(d.chart&&d.chart.legend||[]).map(l=>`<span><span class="ldot" style="background:${l.color}"></span>${l.label}</span>`).join('')}</div>
+        </div>
+        <div style="margin-top:22px">${progressHTML}</div>
+      </div>
+    </div>
+    ${tableHTML}
+  </div>
+  <div class="ins-grid">${insightHTML}</div>
+  <footer>
+    <p>${d.clientName} | Campaign Report | ${d.period||''}</p>
+    <p>Generated: ${today} | נוצר על ידי DashGen</p>
+  </footer>
+</div>
+<script>
+${barsJS}
+const fills=document.querySelectorAll('.pf');
+fills.forEach(f=>f.style.width='0');
+setTimeout(()=>fills.forEach(f=>f.style.width=f.dataset.w+'%'),500);
+<\/script>
+</body>
+</html>`;
+}
+
+// ── GENERATE
+async function generate() {
+  if (!wb || !activeSheet) { showErr('לא נטען קובץ', 'אנא העלה קובץ Excel תחילה', ''); return; }
+
+  const btn = document.getElementById('gbtn');
+  btn.classList.add('loading'); btn.disabled = true;
+  clearErr();
+  document.getElementById('res').style.display = 'none';
+  document.getElementById('empty').style.display = 'none';
+  setP(10, 'מחלץ נתונים...');
+
+  const cname = document.getElementById('cname').value || activeSheet;
+  const period = document.getElementById('period').value;
+  const ctx = document.getElementById('ctx').value;
+  const data = getData(activeSheet);
+
+  const prompt = `Return ONLY a raw JSON object. No markdown. No backticks. No explanation. Just the JSON starting with { and ending with }.
+
+You are a data analyst. Analyze this marketing campaign data:
+
+Client: "${cname}"
+${period ? `Period: ${period}` : ''}
+${ctx ? `Context: ${ctx}` : ''}
+Data: ${JSON.stringify(data)}
+
+Return this exact JSON structure with real values from the data:
+{
+  "clientName": "client name here",
+  "period": "period string",
+  "subtitle": "short Hebrew subtitle like 'דשבורד ביצועי קמפיין'",
+  "kpis": [
+    {"label": "Hebrew label", "value": "formatted value", "sub": "Hebrew sub text", "status": "ok|warn|mild|"},
+    ... (6 KPI cards total)
+  ],
+  "chart": {
+    "title": "Hebrew chart title",
+    "tag": "ENGLISH TAG",
+    "annotation": "optional annotation text",
+    "bars": [
+      {"d": "label", "v": numeric_value, "t": "n|s|pk", "tooltip": "display text"},
+      ...
+    ],
+    "legend": [
+      {"color": "#5a6bf5", "label": "ימים רגילים"},
+      {"color": "#fbbf24", "label": "ימים מיוחדים"}
+    ]
+  },
+  "progress": [
+    {"label": "Hebrew label", "text": "value text", "pct": number, "color": "red|amber|green|accent"},
+    ... (3 progress bars)
+  ],
+  "table": {
+    "title": "Hebrew title",
+    "tag": "ENGLISH TAG",
+    "cols": ["col1", "col2", "col3"],
+    "rows": [["Hebrew row name", "val1", "val2", "val3"], ...]
+  },
+  "insights": [
+    {"tag": "⚠ ALERT", "title": "Hebrew title", "value": "big value", "desc": "Hebrew 2-sentence description", "rec": "Hebrew recommendation"},
+    {"tag": "★ PEAK", ...},
+    {"tag": "↑ COST", ...},
+    {"tag": "↓ TREND", ...}
+  ]
+}
+
+Use ONLY real values from the data. All text fields in Hebrew. Return ONLY the JSON object.`;
+
+  try {
+    setP(25, 'שולח ל-Claude...');
+    const resp = await fetch('/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt })
+    });
+    setP(65, 'מקבל נתונים...');
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(()=>({}));
+      const msg = err?.error || `HTTP ${resp.status}`;
+      const hint = resp.status===500&&msg.includes('ANTHROPIC_API_KEY') ? 'הגדר ANTHROPIC_API_KEY ב-Vercel → Settings → Environment Variables' : '';
+      throw { t: `שגיאת שרת (${resp.status})`, d: msg, h: hint };
+    }
+
+    const json = await resp.json();
+    setP(82, 'בונה דשבורד...');
+
+    let text = (json.text || '').trim();
+    // strip markdown fences if present
+    text = text.replace(/^```[\w]*\n?/, '').replace(/\n?```\s*$/, '').trim();
+
+    let report;
+    try {
+      // strip any markdown fences or leading text
+      let jsonText = text.replace(/^```[\w]*\n?/, '').replace(/\n?```\s*$/, '').trim();
+      // find the JSON object
+      const start = jsonText.indexOf('{');
+      const end = jsonText.lastIndexOf('}');
+      if (start !== -1 && end !== -1) jsonText = jsonText.slice(start, end + 1);
+      report = JSON.parse(jsonText);
+    } catch(e) {
+      throw { t: 'שגיאת פענוח JSON', d: 'Claude החזיר: ' + text.slice(0,300), h: 'נסה שוב — לפעמים המודל מוסיף טקסט מיותר' };
+    }
+
+    setP(95, 'מרכיב HTML...');
+    currentHTML = buildDashboard(report);
+    setP(100, 'הושלם!');
+    setTimeout(() => document.getElementById('prog').classList.remove('on'), 700);
+
+    showResult(cname);
+    addHist(cname);
+
+  } catch(e) {
+    if (e?.t) showErr(e.t, e.d, e.h||'');
+    else showErr('שגיאה', e?.message||String(e), '');
+    document.getElementById('prog').classList.remove('on');
+  }
+
+  btn.classList.remove('loading'); btn.disabled = false;
+}
+
+function showResult(name) {
+  const blob = new Blob([currentHTML], { type: 'text/html;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  document.getElementById('pframe').src = url;
+  document.getElementById('openBtn').href = url;
+  document.getElementById('rtitle').textContent = '✓ ' + name;
+  document.getElementById('plbl').textContent = name;
+  document.getElementById('res').style.display = 'block';
+  document.getElementById('res').scrollIntoView({ behavior: 'smooth' });
+}
+
+function dl() {
+  if (!currentHTML) return;
+  const n = (document.getElementById('cname').value||'report').replace(/[^a-zA-Z0-9\u0590-\u05FF]/g,'_');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([currentHTML],{type:'text/html'}));
+  a.download = n + '_live.html'; a.click();
+}
+
+function addHist(name) {
+  history.unshift({ id: Date.now(), name, html: currentHTML, t: new Date().toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'}) });
+  if (history.length > 8) history.pop();
+  renderHist();
+}
+function renderHist() {
+  document.getElementById('hist').classList.add('on');
+  document.getElementById('hlist').innerHTML = history.map(h => `
+    <div class="hitem" onclick="loadH(${h.id})">
+      <div><div class="hn">${h.name}</div><div class="hm">${h.t}</div></div>
+      <button class="hdl" onclick="event.stopPropagation();dlH(${h.id})">⬇</button>
+    </div>`).join('');
+}
+function loadH(id) { const h=history.find(x=>x.id===id); if(h){currentHTML=h.html;showResult(h.name);} }
+function dlH(id) {
+  const h=history.find(x=>x.id===id); if(!h) return;
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([h.html],{type:'text/html'}));
+  a.download=h.name.replace(/[^a-zA-Z0-9\u0590-\u05FF]/g,'_')+'.html'; a.click();
+}
+
+function getData(s) {
+  const ws = wb.Sheets[s];
+  const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+  return {
+    headers: (rows[0]||[]).slice(0,12),
+    rows: rows.slice(1,20).map(r => r.slice(0,12).map(v => String(v??'').slice(0,40))),
+    totalRows: rows.length - 1
+  };
+}
+
+function setP(pct,msg){document.getElementById('prog').classList.add('on');document.getElementById('pfill').style.width=pct+'%';document.getElementById('pmsg').textContent=msg;}
+function showErr(t,d,h){const b=document.getElementById('errbox');document.getElementById('errt').textContent='⚠ '+t;document.getElementById('errd').textContent=d;const hel=document.getElementById('errh');hel.textContent=h;hel.style.display=h?'block':'none';b.classList.add('on');b.scrollIntoView({behavior:'smooth'});}
+function clearErr(){document.getElementById('errbox').classList.remove('on');}
+</script>
+</body>
+</html>
