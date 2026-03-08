@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DashGen — מחולל דשבורדים</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700;900&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root {
+  --bg: #08080f;
+  --s1: #0d0d1a;
+  --s2: #111122;
+  --s3: #161628;
+  --border: #1e1e35;
+  --border2: #282840;
+  --accent: #6366f1;
+  --accent-glow: rgba(99,102,241,.25);
+  --green: #22c55e;
+  --red: #ef4444;
+  --amber: #f59e0b;
+  --cyan: #06b6d4;
+  --text: #e2e2f2;
+  --muted: #8888aa;
+  --dim: #44445a;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Heebo', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Grid bg */
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background-image:
+    linear-gradient(var(--border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border) 1px, transparent 1px);
+  background-size: 44px 44px;
+  opacity: .2;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* TOPBAR */
+.topbar {
+  position: relative; z-index: 10;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 18px 32px;
+  border-bottom: 1px solid var(--border2);
+  background: var(--s1);
+}
+.topbar::after {
+  content: '';
+  position: absolute; bottom: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--accent), var(--cyan), transparent);
+}
+.logo { display: flex; align-items: center; gap: 12px; }
+.logo-icon {
+  width: 34px; height: 34px; border-radius: 8px;
+  background: linear-gradient(135deg, var(--accent), #a855f7);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; flex-shrink: 0;
+}
+.logo-text { font-size: 17px; font-weight: 900; color: #fff; letter-spacing: -.03em; }
+.logo-text span { color: #818cf8; }
+.logo-sub { font-size: 11px; color: var(--muted); margin-top: 1px; }
+.topbar-right { display: flex; align-items: center; gap: 14px; }
+.badge-version {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px; color: var(--muted);
+  background: var(--s3); border: 1px solid var(--border2);
+  padding: 3px 10px; border-radius: 99px;
+}
+
+/* LAYOUT */
+.layout {
+  position: relative; z-index: 1;
+  display: grid;
+  grid-template-columns: 340px 1fr;
+  min-height: calc(100vh - 61px);
+}
+@media(max-width: 900px) { .layout { grid-template-columns: 1fr; } }
+
+/* SIDEBAR */
+.sidebar {
+  background: var(--s1);
+  border-left: 1px solid var(--border2);
+  padding: 28px 24px;
+  display: flex; flex-direction: column; gap: 24px;
+  position: sticky; top: 61px; height: calc(100vh - 61px);
+  overflow-y: auto;
+}
+
+.section-label {
+  font-size: 10px; font-weight: 700; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--muted);
+  margin-bottom: 10px;
+}
+
+/* DROP ZONE */
+.dropzone {
+  border: 2px dashed var(--border2);
+  border-radius: 14px;
+  padding: 28px 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: all .2s;
+  background: var(--s2);
+  position: relative;
+  overflow: hidden;
+}
+.dropzone:hover, .dropzone.drag { border-color: var(--accent); background: rgba(99,102,241,.06); box-shadow: 0 0 24px var(--accent-glow); }
+.dropzone-icon { font-size: 32px; margin-bottom: 10px; }
+.dropzone-title { font-size: 14px; font-weight: 700; color: #fff; margin-bottom: 5px; }
+.dropzone-sub { font-size: 12px; color: var(--muted); line-height: 1.5; }
+.dropzone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+
+/* FILE INFO */
+.file-info {
+  background: var(--s2); border: 1px solid var(--border2);
+  border-radius: 10px; padding: 14px;
+  display: none;
+}
+.file-info.show { display: block; }
+.file-name { font-size: 13px; font-weight: 700; color: #fff; margin-bottom: 4px; word-break: break-all; }
+.file-meta { font-size: 11px; color: var(--muted); font-family: 'JetBrains Mono', monospace; }
+
+/* SHEET TABS */
+.sheet-tabs { display: flex; flex-wrap: wrap; gap: 7px; }
+.sheet-tab {
+  padding: 5px 12px; border-radius: 6px;
+  border: 1px solid var(--border2);
+  background: var(--s2); color: var(--muted);
+  font-size: 12px; cursor: pointer; transition: all .15s;
+}
+.sheet-tab:hover { border-color: var(--accent); color: var(--text); }
+.sheet-tab.active { border-color: var(--accent); background: rgba(99,102,241,.15); color: #818cf8; font-weight: 700; }
+
+/* SELECT */
+.field-group { display: flex; flex-direction: column; gap: 8px; }
+.field-label { font-size: 12px; color: var(--muted); }
+select, textarea {
+  width: 100%;
+  background: var(--s2); border: 1px solid var(--border2);
+  color: var(--text); border-radius: 8px;
+  font-family: 'Heebo', sans-serif; font-size: 13px;
+  padding: 9px 12px; outline: none;
+  transition: border-color .15s;
+}
+select:focus, textarea:focus { border-color: var(--accent); }
+textarea { min-height: 72px; resize: vertical; }
+
+/* GENERATE BTN */
+.gen-btn {
+  width: 100%; padding: 14px;
+  border-radius: 10px; border: none;
+  background: linear-gradient(135deg, var(--accent), #a855f7);
+  color: #fff; font-size: 15px; font-weight: 700;
+  cursor: pointer; font-family: 'Heebo', sans-serif;
+  letter-spacing: .01em;
+  box-shadow: 0 4px 20px var(--accent-glow);
+  transition: all .2s; position: relative; overflow: hidden;
+}
+.gen-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 28px var(--accent-glow); }
+.gen-btn:disabled { background: var(--s3); color: var(--muted); box-shadow: none; cursor: not-allowed; transform: none; }
+.gen-btn .spinner {
+  display: none; width: 16px; height: 16px;
+  border: 2px solid rgba(255,255,255,.3); border-top-color: #fff;
+  border-radius: 50%; animation: spin .7s linear infinite;
+  margin: 0 auto;
+}
+.gen-btn.loading .btn-text { display: none; }
+.gen-btn.loading .spinner { display: block; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* PROGRESS */
+.progress-wrap { display: none; }
+.progress-wrap.show { display: block; }
+.progress-bar { height: 3px; background: var(--border2); border-radius: 3px; overflow: hidden; margin-bottom: 8px; }
+.progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent), #a855f7); border-radius: 3px; transition: width .4s ease; width: 0%; }
+.progress-msg { font-size: 11px; color: var(--muted); font-family: 'JetBrains Mono', monospace; }
+
+/* MAIN CONTENT */
+.main { padding: 32px; background: var(--bg); }
+@media(max-width: 900px) { .main { padding: 20px; } }
+
+/* EMPTY STATE */
+.empty-state {
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  min-height: 60vh; text-align: center; gap: 16px;
+}
+.empty-icon { font-size: 56px; opacity: .3; }
+.empty-title { font-size: 22px; font-weight: 700; color: var(--muted); }
+.empty-sub { font-size: 14px; color: var(--dim); max-width: 360px; line-height: 1.6; }
+
+/* STATUS */
+.status-box {
+  padding: 12px 16px; border-radius: 10px;
+  font-size: 13px; line-height: 1.5; margin-bottom: 20px;
+  display: none;
+}
+.status-box.show { display: block; }
+.status-box.error { background: rgba(239,68,68,.1); border: 1px solid rgba(239,68,68,.3); color: #f87171; }
+.status-box.success { background: rgba(34,197,94,.1); border: 1px solid rgba(34,197,94,.3); color: #4ade80; }
+
+/* RESULT */
+.result-header {
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 12px; margin-bottom: 20px;
+}
+.result-title { font-size: 18px; font-weight: 700; color: #fff; }
+.result-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.btn {
+  padding: 8px 18px; border-radius: 8px;
+  font-size: 13px; font-weight: 700; cursor: pointer;
+  font-family: 'Heebo', sans-serif; transition: all .15s;
+  display: inline-flex; align-items: center; gap: 7px;
+  text-decoration: none;
+}
+.btn-primary { background: var(--green); color: #000; border: none; }
+.btn-primary:hover { background: #4ade80; }
+.btn-outline { background: transparent; color: var(--muted); border: 1px solid var(--border2); }
+.btn-outline:hover { border-color: var(--accent); color: var(--text); }
+.btn-copy { background: transparent; color: #818cf8; border: 1px solid rgba(99,102,241,.4); }
+.btn-copy:hover { background: rgba(99,102,241,.1); }
+
+/* PREVIEW */
+.preview-wrap {
+  background: var(--s1); border: 1px solid var(--border2);
+  border-radius: 14px; overflow: hidden;
+}
+.preview-bar {
+  padding: 10px 16px; background: var(--s2);
+  border-bottom: 1px solid var(--border2);
+  display: flex; align-items: center; gap: 8px;
+}
+.preview-dot { width: 10px; height: 10px; border-radius: 50%; }
+.preview-iframe {
+  width: 100%; height: 70vh; border: none;
+  background: #07070e;
+}
+
+/* HISTORY */
+.history-list { display: flex; flex-direction: column; gap: 8px; margin-top: 24px; }
+.history-item {
+  background: var(--s2); border: 1px solid var(--border2);
+  border-radius: 10px; padding: 12px 14px;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  cursor: pointer; transition: all .15s;
+}
+.history-item:hover { border-color: var(--accent); }
+.history-name { font-size: 13px; font-weight: 700; color: #fff; }
+.history-meta { font-size: 11px; color: var(--muted); margin-top: 2px; font-family: 'JetBrains Mono', monospace; }
+.history-btn {
+  font-size: 11px; padding: 4px 10px; border-radius: 6px;
+  border: 1px solid var(--border2); background: transparent;
+  color: var(--muted); cursor: pointer; font-family: 'Heebo', sans-serif;
+  white-space: nowrap; transition: all .15s; flex-shrink: 0;
+}
+.history-btn:hover { border-color: var(--green); color: var(--green); }
+
+/* ALERTS */
+.alert {
+  padding: 10px 14px; border-radius: 8px; font-size: 12px; line-height: 1.5;
+  background: rgba(245,158,11,.08); border: 1px solid rgba(245,158,11,.25);
+  color: #fbbf24;
+}
+
+/* SCROLLBAR */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: var(--s1); }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+
+/* FADE */
+.fade-in { animation: fadeIn .4s ease; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+</style>
+</head>
+<body>
+
+<nav class="topbar">
+  <div class="logo">
+    <div class="logo-icon">📊</div>
+    <div>
+      <div class="logo-text">Dash<span>Gen</span></div>
+      <div class="logo-sub">מחולל דשבורדים אוטומטי</div>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <span class="badge-version">v1.0</span>
+  </div>
+</nav>
+
+<div class="layout">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+
+    <!-- Upload -->
+    <div>
+      <div class="section-label">1. העלאת קובץ</div>
+      <div class="dropzone" id="dropzone">
+        <input type="file" id="fileInput" accept=".xlsx,.xls,.csv">
+        <div class="dropzone-icon">📁</div>
+        <div class="dropzone-title">גרור קובץ לכאן</div>
+        <div class="dropzone-sub">Excel, Google Sheets (.xlsx .xls .csv)<br>או לחץ לבחירה</div>
+      </div>
+      <div class="file-info" id="fileInfo">
+        <div class="file-name" id="fileName"></div>
+        <div class="file-meta" id="fileMeta"></div>
+      </div>
+    </div>
+
+    <!-- Sheets -->
+    <div id="sheetSection" style="display:none">
+      <div class="section-label">2. בחירת גיליון</div>
+      <div class="sheet-tabs" id="sheetTabs"></div>
+    </div>
+
+    <!-- Config -->
+    <div id="configSection" style="display:none">
+      <div class="section-label">3. הגדרות דשבורד</div>
+      <div class="field-group" style="margin-bottom:12px">
+        <label class="field-label">שם הלקוח / הדוח</label>
+        <input type="text" id="clientName" placeholder="לדוגמה: ENAV, חברת ABC..."
+          style="background:var(--s2);border:1px solid var(--border2);color:var(--text);border-radius:8px;font-family:'Heebo',sans-serif;font-size:13px;padding:9px 12px;outline:none;width:100%;transition:border-color .15s"
+          onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border2)'">
+      </div>
+      <div class="field-group" style="margin-bottom:12px">
+        <label class="field-label">סוג דשבורד</label>
+        <select id="dashType">
+          <option value="summary">📋 סיכום KPI מרכזי</option>
+          <option value="comparison">📊 השוואה בין תקופות</option>
+          <option value="flow">→ תרשים זרימה / תהליך</option>
+          <option value="timeline">📅 ציר זמן / רודמאפ</option>
+          <option value="hierarchy">🌿 היררכיה / עץ</option>
+        </select>
+      </div>
+      <div class="field-group">
+        <label class="field-label">הקשר נוסף (אופציונלי)</label>
+        <textarea id="context" placeholder="לדוגמה: התמקד ב-Q3, הדגש ירידות, השווה מול יעד..."></textarea>
+      </div>
+    </div>
+
+    <!-- Generate -->
+    <div id="genSection" style="display:none">
+      <button class="gen-btn" id="genBtn" onclick="generate()">
+        <span class="btn-text">✨ צור דשבורד</span>
+        <div class="spinner"></div>
+      </button>
+      <div class="progress-wrap" id="progressWrap">
+        <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+        <div class="progress-msg" id="progressMsg">מנתח נתונים...</div>
+      </div>
+    </div>
+
+    <div class="alert" style="font-size:11px;line-height:1.6">
+      ✅ <strong>מוכן לשימוש</strong><br>
+      מפתח ה-API מוגדר בשרת.<br>
+      אין צורך בהגדרות נוספות.
+    </div>
+
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main" id="mainContent">
+
+    <!-- Empty state -->
+    <div class="empty-state" id="emptyState">
+      <div class="empty-icon">📊</div>
+      <div class="empty-title">מוכן ליצור דשבורד</div>
+      <div class="empty-sub">העלה קובץ Excel או Google Sheets בצד שמאל, בחר גיליון ולחץ על "צור דשבורד"</div>
+    </div>
+
+    <!-- Status -->
+    <div class="status-box" id="statusBox"></div>
+
+    <!-- Result -->
+    <div id="resultArea" style="display:none" class="fade-in">
+      <div class="result-header">
+        <div class="result-title" id="resultTitle">דשבורד מוכן</div>
+        <div class="result-actions">
+          <button class="btn btn-copy" id="copyLinkBtn" onclick="copyLink()">🔗 העתק קישור</button>
+          <button class="btn btn-outline" onclick="downloadHTML()">⬇ הורד HTML</button>
+          <a class="btn btn-primary" id="openBtn" target="_blank">↗ פתח בטאב חדש</a>
+        </div>
+      </div>
+      <div class="preview-wrap">
+        <div class="preview-bar">
+          <div class="preview-dot" style="background:#ef4444"></div>
+          <div class="preview-dot" style="background:#f59e0b"></div>
+          <div class="preview-dot" style="background:#22c55e"></div>
+          <span style="font-size:11px;color:var(--muted);font-family:'JetBrains Mono',monospace;margin-right:10px" id="previewUrl">תצוגה מקדימה</span>
+        </div>
+        <iframe id="previewFrame" class="preview-iframe"></iframe>
+      </div>
+    </div>
+
+    <!-- History -->
+    <div id="historyArea" style="display:none">
+      <div style="margin-top:32px;padding-top:24px;border-top:1px solid var(--border2)">
+        <div style="font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:14px">דשבורדים שנוצרו בסשן הזה</div>
+        <div class="history-list" id="historyList"></div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+
+
+<script>
+// ── STATE ──────────────────────────────────────────────────────
+let workbook = null;
+let activeSheet = null;
+let generatedHTML = '';
+let history = [];
+let generatedBlob = null;
+
+// ── FILE HANDLING ──────────────────────────────────────────────
+const dropzone = document.getElementById('dropzone');
+const fileInput = document.getElementById('fileInput');
+
+dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('drag'); });
+dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag'));
+dropzone.addEventListener('drop', e => {
+  e.preventDefault(); dropzone.classList.remove('drag');
+  const f = e.dataTransfer.files[0];
+  if (f) handleFile(f);
+});
+fileInput.addEventListener('change', e => { if (e.target.files[0]) handleFile(e.target.files[0]); });
+
+function handleFile(file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = new Uint8Array(e.target.result);
+      workbook = XLSX.read(data, { type: 'array' });
+
+      // UI updates
+      document.getElementById('fileName').textContent = file.name;
+      document.getElementById('fileMeta').textContent =
+        `${workbook.SheetNames.length} גיליונות  |  ${(file.size/1024).toFixed(1)} KB`;
+      document.getElementById('fileInfo').classList.add('show');
+
+      renderSheetTabs();
+      document.getElementById('sheetSection').style.display = 'block';
+      document.getElementById('configSection').style.display = 'block';
+      document.getElementById('genSection').style.display = 'block';
+
+      // Auto-fill client name from filename
+      const nameInput = document.getElementById('clientName');
+      if (!nameInput.value) {
+        nameInput.value = file.name.replace(/\.[^.]+$/, '').replace(/[_\-]/g, ' ');
+      }
+    } catch(err) {
+      showStatus('error', 'שגיאה בקריאת הקובץ: ' + err.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function renderSheetTabs() {
+  const tabs = document.getElementById('sheetTabs');
+  tabs.innerHTML = '';
+  workbook.SheetNames.forEach((name, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'sheet-tab' + (i === 0 ? ' active' : '');
+    btn.textContent = name;
+    btn.onclick = () => {
+      document.querySelectorAll('.sheet-tab').forEach(t => t.classList.remove('active'));
+      btn.classList.add('active');
+      activeSheet = name;
+    };
+    tabs.appendChild(btn);
+    if (i === 0) activeSheet = name;
+  });
+}
+
+// ── DATA EXTRACTION ────────────────────────────────────────────
+function extractSheetData(sheetName) {
+  const ws = workbook.Sheets[sheetName];
+  const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+  const headers = (rows[0] || []).slice(0, 14);
+  const sampleRows = rows.slice(1, 22).map(r =>
+    r.slice(0, 14).map(v => {
+      if (v instanceof Date) return v.toLocaleDateString('he-IL');
+      const s = String(v ?? '');
+      return s.length > 40 ? s.slice(0, 40) + '…' : s;
+    })
+  );
+  return { headers, sampleRows, totalRows: rows.length - 1 };
+}
+
+// ── REPAIR JSON ────────────────────────────────────────────────
+function repairJSON(raw) {
+  let s = raw.trim()
+    .replace(/^```[\w]*\s*/i, '')
+    .replace(/\s*```\s*$/i, '')
+    .trim();
+  const start = s.indexOf('[');
+  const end = s.lastIndexOf(']');
+  if (start !== -1 && end > start) return s.slice(start, end + 1);
+  if (start !== -1 && !s.endsWith(']')) {
+    const lastBrace = s.lastIndexOf('}');
+    if (lastBrace > start) return s.slice(start, lastBrace + 1) + ']';
+  }
+  return s;
+}
+
+// ── GENERATE ──────────────────────────────────────────────────
+async function generate() {
+  const apiKey = localStorage.getItem('dashgen_api_key');
+  
+  if (!workbook || !activeSheet) return;
+
+  const btn = document.getElementById('genBtn');
+  const clientName = document.getElementById('clientName').value || activeSheet;
+  const dashType = document.getElementById('dashType').value;
+  const context = document.getElementById('context').value;
+
+  btn.classList.add('loading');
+  btn.disabled = true;
+  showProgress(10, 'מחלץ נתונים...');
+  hideStatus();
+  document.getElementById('resultArea').style.display = 'none';
+
+  try {
+    const sheetData = extractSheetData(activeSheet);
+    const dashTypes = {
+      summary: 'סיכום KPI ומדדים מרכזיים עם כרטיסי נתונים',
+      comparison: 'השוואה בין תקופות / קטגוריות עם גרף עמודות',
+      flow: 'תרשים זרימה / תהליך המציג שלבים ומעברים',
+      timeline: 'ציר זמן / רודמאפ המציג אירועים לפי תאריכים',
+      hierarchy: 'היררכיה / עץ המציג יחסי הורה-ילד'
+    };
+
+    showProgress(25, 'שולח ל-Claude AI...');
+
+    const prompt = `You are a data visualization expert. Create a complete, beautiful, self-contained HTML dashboard page.
+
+Client: "${clientName}"
+Sheet: "${activeSheet}"
+Dashboard type: ${dashTypes[dashType]}
+Data:
+${JSON.stringify(sheetData)}
+${context ? `Extra context: ${context}` : ''}
+
+REQUIREMENTS:
+1. Output ONLY a complete HTML document (<!DOCTYPE html> ... </html>). Nothing else.
+2. Dark theme: background #07070e, cards #111120, text #e2e2f2
+3. RTL Hebrew layout (dir="rtl"), font: Heebo from Google Fonts
+4. Include real data from the spreadsheet - use actual column names and values
+5. KPI cards at top with colored borders (indigo, green, red, amber, cyan)
+6. A bar chart using pure CSS/JS (no external chart libraries) showing key metric over time/categories
+7. A comparison table if multiple time periods exist
+8. 2-4 insight cards at the bottom with recommendations
+9. Animated progress bars and fade-in effects
+10. Responsive (works on mobile)
+11. Professional executive style - no emojis in data, clean typography
+12. The dashboard must be FULLY self-contained - no external dependencies except Google Fonts
+13. Title should include "${clientName}"
+14. Use JetBrains Mono for numbers, Heebo for text
+
+Return ONLY the complete HTML. Start with <!DOCTYPE html>.`;
+
+    const resp = await fetch('/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt })
+    });
+
+    showProgress(75, 'מעבד תגובה...');
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err?.error || `HTTP ${resp.status}`);
+    }
+
+    const data = await resp.json();
+    let html = data.html || '';
+    html = html.trim();
+    if (!html.startsWith('<!DOCTYPE') && !html.startsWith('<html')) {
+      const start = html.indexOf('<!DOCTYPE');
+      if (start !== -1) html = html.slice(start);
+      else throw new Error('התגובה לא כוללת HTML תקין. נסה שוב.');
+    }
+
+    showProgress(95, 'מציג תצוגה מקדימה...');
+    generatedHTML = html;
+    showResult(clientName, activeSheet);
+    addToHistory(clientName, activeSheet, dashType, html);
+    showProgress(100, 'הושלם!');
+    setTimeout(() => hideProgress(), 800);
+
+  } catch(err) {
+    showStatus('error', '⚠ שגיאה: ' + err.message);
+    hideProgress();
+  } finally {
+    btn.classList.remove('loading');
+    btn.disabled = false;
+  }
+}
+
+// ── RESULT ────────────────────────────────────────────────────
+function showResult(clientName, sheetName) {
+  document.getElementById('emptyState').style.display = 'none';
+  document.getElementById('resultTitle').textContent = `דשבורד — ${clientName}`;
+  document.getElementById('resultArea').style.display = 'block';
+  document.getElementById('resultArea').classList.add('fade-in');
+
+  // Preview in iframe
+  const frame = document.getElementById('previewFrame');
+  const blob = new Blob([generatedHTML], { type: 'text/html;charset=utf-8' });
+  generatedBlob = blob;
+  const url = URL.createObjectURL(blob);
+  frame.src = url;
+  document.getElementById('openBtn').href = url;
+  document.getElementById('previewUrl').textContent = `${clientName} — ${sheetName}`;
+}
+
+function downloadHTML() {
+  if (!generatedHTML) return;
+  const clientName = document.getElementById('clientName').value || 'dashboard';
+  const safe = clientName.replace(/[^a-zA-Z0-9\u0590-\u05FF]/g, '_');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([generatedHTML], { type: 'text/html' }));
+  a.download = `${safe}.html`;
+  a.click();
+}
+
+function copyLink() {
+  if (!generatedBlob) return;
+  const url = URL.createObjectURL(generatedBlob);
+  navigator.clipboard.writeText(url).then(() => {
+    const btn = document.getElementById('copyLinkBtn');
+    btn.textContent = '✓ הועתק!';
+    setTimeout(() => btn.textContent = '🔗 העתק קישור', 2000);
+  });
+}
+
+// ── HISTORY ───────────────────────────────────────────────────
+function addToHistory(clientName, sheetName, dashType, html) {
+  const item = {
+    id: Date.now(),
+    clientName, sheetName, dashType, html,
+    time: new Date().toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })
+  };
+  history.unshift(item);
+  renderHistory();
+}
+
+function renderHistory() {
+  if (history.length === 0) return;
+  document.getElementById('historyArea').style.display = 'block';
+  const list = document.getElementById('historyList');
+  list.innerHTML = history.map(item => `
+    <div class="history-item" onclick="loadFromHistory(${item.id})">
+      <div>
+        <div class="history-name">${item.clientName}</div>
+        <div class="history-meta">${item.sheetName}  |  ${item.time}</div>
+      </div>
+      <button class="history-btn" onclick="event.stopPropagation();downloadFromHistory(${item.id})">⬇ הורד</button>
+    </div>
+  `).join('');
+}
+
+function loadFromHistory(id) {
+  const item = history.find(h => h.id === id);
+  if (!item) return;
+  generatedHTML = item.html;
+  showResult(item.clientName, item.sheetName);
+}
+
+function downloadFromHistory(id) {
+  const item = history.find(h => h.id === id);
+  if (!item) return;
+  const safe = item.clientName.replace(/[^a-zA-Z0-9\u0590-\u05FF]/g, '_');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([item.html], { type: 'text/html' }));
+  a.download = `${safe}.html`;
+  a.click();
+}
+
+// ── UI HELPERS ────────────────────────────────────────────────
+function showProgress(pct, msg) {
+  document.getElementById('progressWrap').classList.add('show');
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressMsg').textContent = msg;
+}
+function hideProgress() {
+  document.getElementById('progressWrap').classList.remove('show');
+}
+function showStatus(type, msg) {
+  const box = document.getElementById('statusBox');
+  box.className = 'status-box show ' + type;
+  box.textContent = msg;
+}
+function hideStatus() {
+  document.getElementById('statusBox').classList.remove('show');
+}
+
+
+</script>
+</body>
+</html>
